@@ -1,0 +1,209 @@
+package httpserver
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"time"
+
+	"github.com/mayvqt/aperture/internal/db"
+	"github.com/mayvqt/aperture/internal/mediaserver"
+	"github.com/mayvqt/aperture/internal/security"
+)
+
+const (
+	sessionCookieName   = "aperture_session"
+	publicCSRFCookie    = "aperture_public_csrf"
+	anonymousCSRFCookie = "aperture_form_csrf"
+	csrfMaxAge          = 3600
+	adminCheckTimeout   = 5 * time.Second
+)
+
+func (s *Server) admin(next func(http.ResponseWriter, *http.Request, db.Session)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		complete, err := s.setupComplete(r.Context())
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		if !complete {
+			http.Redirect(w, r, "/setup", http.StatusSeeOther)
+			return
+		}
+		session, ok, err := s.session(r)
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		if !ok {
+			http.SetCookie(w, s.sessionCookie("", -time.Hour))
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		settings, err := s.settings(r.Context())
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		checkCtx, cancel := context.WithTimeout(r.Context(), adminCheckTimeout)
+		isAdmin, err := s.media.IsAdmin(checkCtx, settings.ServerURL, session.AccessToken, session.DeviceID, session.UserID)
+		cancel()
+		if err != nil {
+			if invalidMediaSession(err) {
+				s.clearSession(w, r, session.ID)
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			s.message(w, "Could not verify access", "Aperture could not confirm your media-server administrator access. Try again shortly.", http.StatusBadGateway)
+			return
+		}
+		if !isAdmin {
+			s.clearSession(w, r, session.ID)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		next(w, r, session)
+	}
+}
+func (s *Server) adminPost(next func(http.ResponseWriter, *http.Request, db.Session)) http.HandlerFunc {
+	return s.admin(func(w http.ResponseWriter, r *http.Request, session db.Session) {
+		if !s.validCSRF(r, session.CSRFSecret) {
+			s.message(w, "Invalid request", "Refresh the page and try again.", http.StatusBadRequest)
+			return
+		}
+		next(w, r, session)
+	})
+}
+func (s *Server) session(r *http.Request) (db.Session, bool, error) {
+	cookie, err := r.Cookie(sessionCookieName)
+	if err != nil || cookie.Value == "" {
+		return db.Session{}, false, nil
+	}
+	session, err := s.store.Session(r.Context(), cookie.Value)
+	if errors.Is(err, db.ErrNotFound) {
+		return db.Session{}, false, nil
+	}
+	if err != nil {
+		return db.Session{}, false, err
+	}
+	return session, true, nil
+}
+func (s *Server) data(_ *http.Request, session db.Session) viewData {
+	return viewData{Session: &session, CSRF: session.CSRFSecret}
+}
+func (s *Server) validCSRF(r *http.Request, expected string) bool {
+	actual, ok := formCSRF(r)
+	if expected == "" || actual == "" {
+		return false
+	}
+	return ok && security.ConstantEqual(expected, actual)
+}
+func (s *Server) publicCSRF(w http.ResponseWriter, r *http.Request, token string) (string, error) {
+	settings, err := s.settings(r.Context())
+	if err != nil {
+		return "", err
+	}
+	if settings.InviteSecret == "" {
+		return "", errors.New("invite secret is not configured")
+	}
+	return s.signedCSRF(w, publicCSRFCookie, "/i/", settings.InviteSecret, token+":")
+}
+func (s *Server) anonymousCSRF(w http.ResponseWriter, r *http.Request) (string, error) {
+	settings, err := s.settings(r.Context())
+	if err != nil {
+		return "", err
+	}
+	if settings.SessionSecret == "" {
+		return "", errors.New("session secret is not configured")
+	}
+	return s.signedCSRF(w, anonymousCSRFCookie, "/", settings.SessionSecret, "")
+}
+func (s *Server) signedCSRF(w http.ResponseWriter, cookieName, path, secret, prefix string) (string, error) {
+	value, err := csrfValue()
+	if err != nil {
+		return "", err
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     cookieName,
+		Value:    security.HashToken(secret, prefix+value),
+		Path:     path,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   s.secureCookie(),
+		MaxAge:   csrfMaxAge,
+	})
+	return value, nil
+}
+func (s *Server) validAnonymousCSRF(r *http.Request) bool {
+	cookie, err := r.Cookie(anonymousCSRFCookie)
+	if err != nil {
+		return false
+	}
+	settings, err := s.settings(r.Context())
+	if err != nil || settings.SessionSecret == "" {
+		return false
+	}
+	return validSignedRequestCSRF(r, cookie.Value, settings.SessionSecret, "")
+}
+func (s *Server) validPublicCSRF(r *http.Request, token string) bool {
+	cookie, err := r.Cookie(publicCSRFCookie)
+	if err != nil {
+		return false
+	}
+	settings, err := s.settings(r.Context())
+	if err != nil || settings.InviteSecret == "" {
+		return false
+	}
+	return validSignedRequestCSRF(r, cookie.Value, settings.InviteSecret, token+":")
+}
+func validSignedRequestCSRF(r *http.Request, cookieValue, secret, prefix string) bool {
+	formValue, ok := formCSRF(r)
+	return ok && validSignedCSRF(cookieValue, formValue, secret, prefix)
+}
+func validSignedCSRF(cookieValue, formValue, secret, prefix string) bool {
+	if cookieValue == "" || formValue == "" || secret == "" {
+		return false
+	}
+	return security.ConstantEqual(cookieValue, security.HashToken(secret, prefix+formValue))
+}
+func formCSRF(r *http.Request) (string, bool) {
+	if err := r.ParseForm(); err != nil {
+		return "", false
+	}
+	return r.FormValue("csrf"), true
+}
+func (s *Server) sessionCookie(value string, maxAge time.Duration) *http.Cookie {
+	expires := time.Now().Add(maxAge)
+	if maxAge < 0 {
+		expires = time.Unix(1, 0)
+	}
+	return &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   s.secureCookie(),
+		MaxAge:   int(maxAge.Seconds()),
+		Expires:  expires,
+	}
+}
+func (s *Server) secureCookie() bool {
+	_, _, secure := s.runtimeSettings()
+	return secure
+}
+
+func csrfValue() (string, error) {
+	return security.RandomToken(32)
+}
+
+func invalidMediaSession(err error) bool {
+	var httpErr *mediaserver.HTTPError
+	return errors.As(err, &httpErr) &&
+		(httpErr.StatusCode == http.StatusUnauthorized || httpErr.StatusCode == http.StatusForbidden)
+}
+
+func (s *Server) clearSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	_ = s.store.DeleteSession(r.Context(), sessionID)
+	http.SetCookie(w, s.sessionCookie("", -time.Hour))
+}

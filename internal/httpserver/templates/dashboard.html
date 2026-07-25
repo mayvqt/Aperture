@@ -1,0 +1,172 @@
+{{define "admin"}}{{template "base-start" .}}<div class="page-head">
+<div>
+<p class="eyebrow">Signed in as {{.Session.Username}}</p>
+<h1>Dashboard</h1>
+<p>See active invites, recent signups, and expiring accounts.</p>
+</div>
+<p class="actions">
+<a class="button" href="/admin/invites/new">Create invite</a>
+<a class="button secondary" href="/admin/templates">Templates</a>
+</p>
+</div>{{if .HealthChecks}}<section class="health-list">
+{{range .HealthChecks}}<div class="notice health {{.Level}}">
+<div>
+<strong>{{.Title}}</strong>
+<p>{{.Detail}}</p>
+</div>
+{{if .URL}}<a class="button secondary small" href="{{.URL}}">{{.Action}}</a>{{end}}
+</div>{{end}}
+</section>{{end}}<section class="grid four">
+<div class="metric">
+<strong>{{.Stats.ActiveInvites}}</strong>
+<span>active invites</span>
+</div>
+<div class="metric">
+<strong>{{.Stats.Registrations}}</strong>
+<span>recent signups</span>
+</div>
+<div class="metric">
+<strong>{{.Stats.NeedsAttention}}</strong>
+<span>review needed</span>
+</div>
+<div class="metric">
+<strong>{{.Stats.ScheduledUserDisables}}</strong>
+<span>accounts expiring</span>
+</div>
+</section>
+<section class="dashboard-preview section">
+<div class="panel">
+<div class="page-head">
+<h2>Invites</h2>
+<a class="button secondary" href="/admin/invites">View all</a>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Uses</th>
+<th>Status</th>
+<th>Account access</th>
+</tr>
+</thead>
+<tbody>{{range .Invites}}<tr>
+<td>{{.Label}}</td>
+<td>{{.Uses}} / {{.MaxUses}}</td>
+<td>
+<span class="status {{inviteStateClass .Enabled .Uses .MaxUses}}">{{inviteState .Enabled .Uses .MaxUses}}</span>
+</td>
+<td>{{userExpiryText .UserExpiryDays}}</td>
+</tr>{{else}}<tr>
+<td colspan="4">No invites yet.</td>
+</tr>{{end}}</tbody>
+</table>
+</div>
+</div>
+<div class="panel">
+<div class="page-head">
+<h2>Recent signups</h2>
+<a class="button secondary" href="/admin/registrations">View all</a>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th>Status</th>
+<th>Access ends</th>
+<th>Retry</th>
+</tr>
+</thead>
+<tbody>{{range .Registrations}}<tr>
+<td>{{.Username}}</td>
+<td>
+<span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
+</td>
+<td>{{nullDate .UserDisableAt}}</td>
+<td>{{nullDateTime .NextDisableAttemptAt}}</td>
+</tr>{{else}}<tr>
+<td colspan="4">No registrations yet.</td>
+</tr>{{end}}</tbody>
+</table>
+</div>
+</div>
+</section>{{template "base-end" .}}{{end}}
+{{define "settings"}}{{template "base-start" .}}<div class="page-head">
+<div>
+<p class="eyebrow">Configuration</p>
+<h1>Settings</h1>
+<p>Connection details and deployment options used by Aperture.</p>
+</div>
+</div>{{if .Message}}<div class="notice">{{.Message}}</div>{{end}}{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<section class="settings-grid">
+<div class="panel">
+<h2>Application setup</h2>
+<form method="post" action="/admin/settings/media-server">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select name="provider"{{if .ProviderManaged}} disabled{{end}}>
+<option value="jellyfin" {{if eq .Settings.Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
+<option value="emby" {{if eq .Settings.Provider "emby"}}selected{{end}}>Emby</option>
+</select>
+{{if not .ProviderManaged}}<span class="hint">Changing the provider or server signs you out. Existing account history still refers to the previous server.</span>{{end}}
+</label>
+<label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span class="hint">The address used in invite links.</span>{{end}}<input name="public_url" value="{{.Settings.PublicURL}}" required{{if .PublicURLManaged}} disabled{{end}}>
+</label>
+<label>Server URL{{if .ServerURLManaged}}<span class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input name="server_url" value="{{.Settings.ServerURL}}" required{{if .ServerURLManaged}} disabled{{end}}>
+</label>
+<label>API key<span class="hint">{{if .APIKeyManaged}}Managed by APERTURE_API_KEY.{{else}}Leave blank to keep the saved key.{{end}}</span>
+<input type="password" name="api_key" autocomplete="off" placeholder="leave blank to keep saved key"{{if .APIKeyManaged}} disabled{{end}}>
+</label>
+{{if not .APIKeyManaged}}<label class="check"><input type="checkbox" name="remove_api_key"> Remove saved API key</label>{{end}}
+{{if or (not .ProviderManaged) (not .PublicURLManaged) (not .ServerURLManaged) (not .APIKeyManaged)}}<button>Save settings</button>{{end}}
+</form>
+</div>
+<aside class="panel">
+<h2>Runtime secrets</h2>
+<p>Session, invite, and encryption secrets are generated automatically unless deployment overrides are set.</p>
+<p class="hint">Sensitive values are never shown here and are encrypted before storage.</p>
+</aside>
+</section>{{template "base-end" .}}{{end}}
+{{define "registrations"}}{{template "base-start" .}}<div class="page-head">
+<div>
+<p class="eyebrow">Account history</p>
+<h1>Registrations</h1>
+<p>Accounts created from invite links and any follow-up work.</p>
+</div>
+</div>
+<div class="table-wrap">
+<table>
+<thead>
+<tr>
+<th>User</th>
+<th>Status</th>
+<th>Account ID</th>
+<th>Access ends</th>
+<th>Ended</th>
+<th>Attempts</th>
+<th>Retry</th>
+<th>Notes</th>
+<th>Action</th>
+<th>Created</th>
+</tr>
+</thead>
+<tbody>{{range .Registrations}}<tr>
+<td>{{.Username}}</td>
+<td>
+<span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
+</td>
+<td>{{.ExternalUserID.String}}</td>
+<td>{{nullDate .UserDisableAt}}</td>
+<td>{{nullDate .UserDisabledAt}}</td>
+<td>{{.DisableAttempts}}</td>
+<td>{{nullDateTime .NextDisableAttemptAt}}</td>
+<td>{{.ErrorMessage.String}}</td>
+<td>{{if canRetryTemplate .Status .ExternalUserID}}<form method="post" action="/admin/registrations/{{.ID}}/retry-template">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<button class="small">Retry access</button>
+</form>{{end}}</td>
+<td>{{.CreatedAt}}</td>
+</tr>{{else}}<tr>
+<td colspan="10">No registrations yet.</td>
+</tr>{{end}}</tbody>
+</table>
+</div>{{template "base-end" .}}{{end}}

@@ -1,0 +1,30 @@
+{{define "public-invite"}}{{template "auth-start" .}}<section class="join-wrap">
+<div class="auth-brand">Aperture</div>
+<div class="panel join-card">
+<p class="eyebrow">Media server access</p>
+<h1>Create your account</h1>
+<p>Choose the username and password.</p>
+{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}
+<form method="post" action="/i/{{.Token}}/register">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<label>Username<span class="hint">Use 3-32 letters, numbers, dots, underscores, or hyphens.</span>
+<input name="username" value="{{.FormUsername}}" autocomplete="username" minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" required autofocus>
+</label>
+<label>Password<span class="hint">At least 8 characters.</span>
+<input type="password" name="password" autocomplete="new-password" minlength="8" required>
+</label>
+<label>Confirm password<input type="password" name="confirm_password" autocomplete="new-password" minlength="8" required>
+</label>
+<button>Create account</button>
+</form>
+</div>
+</section>{{template "auth-end" .}}{{end}}
+
+{{define "guide"}}{{template "auth-start" .}}<section class="join-wrap">
+<div class="auth-brand">Aperture</div>
+<div class="panel join-card">
+<p class="eyebrow">Account ready</p>
+<h1>Account created</h1>
+<p>Your account is ready. Sign in to the media server with the username and password you just created.</p>
+</div>
+</section>{{template "auth-end" .}}{{end}}

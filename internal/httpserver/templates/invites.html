@@ -1,0 +1,80 @@
+{{define "invites"}}{{template "base-start" .}}<div class="page-head">
+<div>
+<p class="eyebrow">Access links</p>
+<h1>Invites</h1>
+<p>{{.Stats.ActiveInvites}} active invite links</p>
+</div>
+<a class="button" href="/admin/invites/new">Create invite</a>
+</div>{{if .NewURL}}<div class="notice">
+<strong>Invite URL</strong>
+<div class="copy-row">
+<code id="new-invite-url" class="invite-url">{{.NewURL}}</code>
+<button type="button" class="secondary" data-copy="new-invite-url" aria-label="Copy invite URL">Copy</button>
+</div>
+</div>{{end}}<div class="invite-list">
+{{range .InviteRows}}<article class="invite-card">
+<div class="invite-card-head">
+<div>
+<h2>{{.Invite.Label}}</h2>
+<p>{{.Invite.Template}} template</p>
+</div>
+<span class="status {{inviteStateClass .Invite.Enabled .Invite.Uses .Invite.MaxUses}}">{{inviteState .Invite.Enabled .Invite.Uses .Invite.MaxUses}}</span>
+</div>
+<div class="invite-details">
+<span><strong>{{.Invite.Uses}} of {{.Invite.MaxUses}}</strong> signups used</span>
+<span><strong>{{inviteExpiryText .Invite.ExpiresAt}}</strong> link expiry</span>
+<span><strong>{{userExpiryText .Invite.UserExpiryDays}}</strong> account access</span>
+{{if .Activity.Username}}<span><strong>{{.Activity.Username}}</strong> last signed up {{dateOnly .Activity.CreatedAt}}</span>{{else}}<span>No signups yet</span>{{end}}
+</div>
+{{if .Invite.Token}}<div class="invite-link-cell">
+<code id="invite-url-{{.Invite.ID}}" class="row-url">{{inviteURL $.PublicURL .Invite.Token}}</code>
+<button type="button" class="secondary small" data-copy="invite-url-{{.Invite.ID}}" aria-label="Copy invite URL">Copy</button>
+</div>{{else}}<p class="muted">This link is no longer available to copy.</p>{{end}}
+<div class="row-actions">{{if .Invite.Enabled}}<form method="post" action="/admin/invites/{{.Invite.ID}}/disable">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<button class="secondary small">Disable</button>
+</form>{{else}}<form method="post" action="/admin/invites/{{.Invite.ID}}/enable">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<button class="secondary small">Enable</button>
+</form>{{end}}
+<a class="button secondary small" href="/admin/invites/new?preset_id={{.Invite.ID}}">Duplicate</a>
+<form method="post" action="/admin/invites/{{.Invite.ID}}/delete" data-confirm="Delete this invite? This cannot be undone.">
+<input type="hidden" name="csrf" value="{{$.CSRF}}">
+<button class="danger small">Delete</button>
+</form>
+</div>
+ </article>{{else}}<p class="empty">No invites yet.</p>{{end}}
+</div>{{template "base-end" .}}{{end}}
+{{define "invite-new"}}{{template "base-start" .}}<div class="page-head">
+<div>
+<p class="eyebrow">New access link</p>
+<h1>Create invite</h1>
+<p>Choose the access template first, then set simple limits.</p>
+</div>
+</div>{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<section class="panel">
+<form method="post" action="/admin/invites">
+<input type="hidden" name="csrf" value="{{.CSRF}}">
+<div class="form-grid">
+<label class="span-2">Label<input name="label" value="{{.Invite.Label}}" placeholder="Family" maxlength="80" required>
+</label>
+<label>Template<select name="template_id">{{range .Templates}}<option value="{{.ID}}" {{if eq .ID $.Invite.TemplateID}}selected{{end}}>{{.Name}}</option>{{end}}</select>
+</label>
+<label>Max uses<input type="number" name="max_uses" min="1" max="500" value="{{if .Invite.MaxUses}}{{.Invite.MaxUses}}{{else}}1{{end}}" required>
+</label>
+<label>Link expires<select name="expires_after_days">
+<option value="0" {{if not .Invite.ExpiresAt.Valid}}selected{{end}}>Never</option>
+<option value="1">24 hours</option>
+<option value="7">7 days</option>
+<option value="30">30 days</option>
+<option value="custom" {{if .Invite.ExpiresAt.Valid}}selected{{end}}>Custom date</option>
+</select>
+</label>
+<label>Custom expiry date<input type="date" name="expires_at" value="{{nullDate .Invite.ExpiresAt}}">
+</label>
+<label>Account access (days)<span class="hint">Use 0 for access that does not expire.</span>
+<input type="number" name="user_expiry_days" min="0" max="3650" value="{{.Invite.UserExpiryDays}}" required>
+</label>
+</div>
+<button>Create invite</button>
+</form>
+</section>{{template "base-end" .}}{{end}}
