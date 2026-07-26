@@ -9,27 +9,22 @@
         <form action="/setup" method="post">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select
-                    .ProviderManaged}} disabled{{end}} name="provider" {{if>
-                <option .Provider eq value="jellyfin" {{if
-                "jellyfin"}}selected{{end}}>Jellyfin</option>
-                <option .Provider eq value="emby" {{if
-                "emby"}}selected{{end}}>Emby</option>
+                    name="provider" {{if .ProviderManaged}}disabled{{end}}>
+                <option value="jellyfin" {{if eq .Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
+                <option value="emby" {{if eq .Provider "emby"}}selected{{end}}>Emby</option>
             </select>
             </label>
             <label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span
-                    class="hint">The address people will use to open invite links.</span>{{end}}<input .PublicURLManaged}}
-                                                                                                       disabled{{end}}
-                                                                                                       name="public_url"
-                                                                                                       placeholder="https://invites.example.com"
-                                                                                                       required{{if
-                                                                                                       value="{{.PublicURL}}">
+                    class="hint">The address people will use to open invite links.</span>{{end}}<input
+                    name="public_url" placeholder="https://invites.example.com" required
+                    value="{{.PublicURL}}" {{if .PublicURLManaged}}disabled{{end}}>
             </label>
             <label>Media-server URL{{if .ServerURLManaged}}<span class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input
-                    .ServerURLManaged}} disabled{{end}} name="server_url" placeholder="http://media-server:8096"
-                    required{{if value="{{.ServerURL}}">
+                    name="server_url" placeholder="http://media-server:8096" required
+                    value="{{.ServerURL}}" {{if .ServerURLManaged}}disabled{{end}}>
             </label>
             <label>API key{{if .APIKeyManaged}}<span class="hint">Managed by APERTURE_API_KEY.</span>{{end}}<input
-                    .APIKeyManaged}} autocomplete="off" disabled{{end}} name="api_key" type="password" {{if>
+                    autocomplete="off" name="api_key" type="password" {{if .APIKeyManaged}}disabled{{end}}>
             </label>
             <button>Save and continue</button>
         </form>

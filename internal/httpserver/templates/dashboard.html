@@ -123,29 +123,25 @@
         <form action="/admin/settings/media-server" method="post">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select
-                    .ProviderManaged}} disabled{{end}} name="provider" {{if>
-                <option .Settings.Provider eq value="jellyfin" {{if
-                "jellyfin"}}selected{{end}}>Jellyfin</option>
-                <option .Settings.Provider eq value="emby" {{if
-                "emby"}}selected{{end}}>Emby</option>
+                    name="provider" {{if .ProviderManaged}}disabled{{end}}>
+                <option value="jellyfin" {{if eq .Settings.Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
+                <option value="emby" {{if eq .Settings.Provider "emby"}}selected{{end}}>Emby</option>
             </select>
                 {{if not .ProviderManaged}}<span class="hint">Changing the provider or server signs you out. Existing account history still refers to the previous server.</span>{{end}}
             </label>
             <label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span
-                    class="hint">The address used in invite links.</span>{{end}}<input .PublicURLManaged}}
-                                                                                       disabled{{end}}
-                                                                                       name="public_url" required{{if
-                                                                                       value="{{.Settings.PublicURL}}">
+                    class="hint">The address used in invite links.</span>{{end}}<input
+                    name="public_url" required value="{{.Settings.PublicURL}}"
+                    {{if .PublicURLManaged}}disabled{{end}}>
             </label>
             <label>Server URL{{if .ServerURLManaged}}<span
-                    class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input .ServerURLManaged}}
-                                                                                     disabled{{end}}
-                                                                                     name="server_url" required{{if
-                                                                                     value="{{.Settings.ServerURL}}">
+                    class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input
+                    name="server_url" required value="{{.Settings.ServerURL}}"
+                    {{if .ServerURLManaged}}disabled{{end}}>
             </label>
             <label>API key<span class="hint">{{if .APIKeyManaged}}Managed by APERTURE_API_KEY.{{else}}Leave blank to keep the saved key.{{end}}</span>
-                <input .APIKeyManaged}} autocomplete="off" disabled{{end}} name="api_key"
-                       placeholder="leave blank to keep saved key" type="password" {{if>
+                <input autocomplete="off" name="api_key" placeholder="leave blank to keep saved key"
+                       type="password" {{if .APIKeyManaged}}disabled{{end}}>
             </label>
             {{if not .APIKeyManaged}}<label class="check"><input name="remove_api_key" type="checkbox"> Remove saved API
             key</label>{{end}}

@@ -76,18 +76,18 @@
                                               value="{{.Invite.Label}}">
             </label>
             <label>Template<select name="template_id">{{range .Templates}}
-                <option $.Invite.TemplateID}}selected{{end}} .ID eq value="{{.ID}}" {{if>{{.Name}}</option>
+                <option value="{{.ID}}" {{if eq .ID $.Invite.TemplateID}}selected{{end}}>{{.Name}}</option>
                 {{end}}</select>
             </label>
             <label>Max uses<input max="500" min="1" name="max_uses" required
                                   type="number" value="{{if .Invite.MaxUses}}{{.Invite.MaxUses}}{{else}}1{{end}}">
             </label>
             <label>Link expires<select name="expires_after_days">
-                <option .Invite.ExpiresAt.Valid}}selected{{end}} not value="0" {{if>Never</option>
+                <option value="0" {{if not .Invite.ExpiresAt.Valid}}selected{{end}}>Never</option>
                 <option value="1">24 hours</option>
                 <option value="7">7 days</option>
                 <option value="30">30 days</option>
-                <option .Invite.ExpiresAt.Valid}}selected{{end}} value="custom" {{if>Custom date</option>
+                <option value="custom" {{if .Invite.ExpiresAt.Valid}}selected{{end}}>Custom date</option>
             </select>
             </label>
             <label>Custom expiry date<input name="expires_at" type="date" value="{{nullDate .Invite.ExpiresAt}}">
