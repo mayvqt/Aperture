@@ -44,12 +44,30 @@ func TestSettingsEnvironmentValuesAreManagedAndNotWritable(t *testing.T) {
 	if getRR.Code != http.StatusOK {
 		t.Fatalf("GET status = %d, want 200; body %s", getRR.Code, getRR.Body.String())
 	}
-	for _, want := range []string{"Managed by APERTURE_MEDIA_PROVIDER", "Managed by APERTURE_PUBLIC_URL", "Managed by APERTURE_SERVER_URL", "Managed by APERTURE_API_KEY", `name="server_url" value="http://media:8096" required disabled`, `name="api_key" autocomplete="off" placeholder="leave blank to keep saved key" disabled`} {
+	body := getRR.Body.String()
+	for _, want := range []string{"Managed by APERTURE_MEDIA_PROVIDER", "Managed by APERTURE_PUBLIC_URL", "Managed by APERTURE_SERVER_URL", "Managed by APERTURE_API_KEY"} {
 		if !strings.Contains(getRR.Body.String(), want) {
 			t.Fatalf("settings body missing %q:\n%s", want, getRR.Body.String())
 		}
 	}
-	if strings.Contains(getRR.Body.String(), ">Save settings</button>") {
+	if !htmlElementHasAttributes(body, "input", map[string]string{
+		"name":     "server_url",
+		"value":    "http://media:8096",
+		"required": "",
+		"disabled": "",
+	}) {
+		t.Fatalf("settings body missing managed server URL input:\n%s", body)
+	}
+	if !htmlElementHasAttributes(body, "input", map[string]string{
+		"name":         "api_key",
+		"type":         "password",
+		"autocomplete": "off",
+		"placeholder":  "leave blank to keep saved key",
+		"disabled":     "",
+	}) {
+		t.Fatalf("settings body missing managed API key input:\n%s", body)
+	}
+	if strings.Contains(body, ">Save settings</button>") {
 		t.Fatalf("fully managed settings still show save action:\n%s", getRR.Body.String())
 	}
 

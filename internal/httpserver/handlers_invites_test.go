@@ -60,7 +60,14 @@ func TestInvitesNewIgnoresMissingPreset(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), `name="max_uses" min="1" max="500" value="1"`) {
+	if !htmlElementHasAttributes(rr.Body.String(), "input", map[string]string{
+		"name":     "max_uses",
+		"type":     "number",
+		"min":      "1",
+		"max":      "500",
+		"value":    "1",
+		"required": "",
+	}) {
 		t.Fatalf("body missing default max uses:\n%s", rr.Body.String())
 	}
 }

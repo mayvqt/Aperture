@@ -52,12 +52,23 @@ func TestRegistrationsPageShowsTemplateRecoveryAction(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
-	for _, want := range []string{
-		`action="/admin/registrations/7/retry-template"`,
-		`name="csrf" value="csrf-secret"`,
-		"Retry access",
-		"policy failed",
-	} {
+	body := rr.Body.String()
+	if !htmlFormHasElement(
+		body,
+		map[string]string{
+			"action": "/admin/registrations/7/retry-template",
+			"method": "post",
+		},
+		"input",
+		map[string]string{
+			"name":  "csrf",
+			"type":  "hidden",
+			"value": "csrf-secret",
+		},
+	) {
+		t.Fatalf("registration retry form missing CSRF input:\n%s", body)
+	}
+	for _, want := range []string{"Retry access", "policy failed"} {
 		if !strings.Contains(rr.Body.String(), want) {
 			t.Fatalf("body missing %q:\n%s", want, rr.Body.String())
 		}

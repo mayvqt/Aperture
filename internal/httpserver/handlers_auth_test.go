@@ -149,7 +149,15 @@ func TestSetupUsesEnvironmentManagedAPIKeyWithoutStoringIt(t *testing.T) {
 	getReq := httptest.NewRequest(http.MethodGet, "/setup", nil)
 	getRR := httptest.NewRecorder()
 	handler.ServeHTTP(getRR, getReq)
-	if getRR.Code != http.StatusOK || !strings.Contains(getRR.Body.String(), "Managed by APERTURE_API_KEY") || !strings.Contains(getRR.Body.String(), `name="api_key" autocomplete="off" disabled`) {
+	body := getRR.Body.String()
+	if getRR.Code != http.StatusOK ||
+		!strings.Contains(body, "Managed by APERTURE_API_KEY") ||
+		!htmlElementHasAttributes(body, "input", map[string]string{
+			"name":         "api_key",
+			"type":         "password",
+			"autocomplete": "off",
+			"disabled":     "",
+		}) {
 		t.Fatalf("managed API key setup form was editable:\n%s", getRR.Body.String())
 	}
 
@@ -192,12 +200,18 @@ func TestSetupConfiguresEmbyEntirelyFromBrowser(t *testing.T) {
 	getReq := httptest.NewRequest(http.MethodGet, "/setup", nil)
 	getRR := httptest.NewRecorder()
 	handler.ServeHTTP(getRR, getReq)
-	csrf := hiddenCSRF(getRR.Body.String())
-	if csrf == "" || !strings.Contains(getRR.Body.String(), `<select name="provider"`) ||
-		!strings.Contains(getRR.Body.String(), `<option value="jellyfin"`) ||
-		!strings.Contains(getRR.Body.String(), `<option value="emby"`) ||
-		strings.Contains(getRR.Body.String(), `<input name="provider"`) ||
-		!strings.Contains(getRR.Body.String(), `name="public_url" value="http://example.com"`) {
+	body := getRR.Body.String()
+	csrf := hiddenCSRF(body)
+	if csrf == "" ||
+		!htmlElementHasAttributes(body, "select", map[string]string{"name": "provider"}) ||
+		!htmlElementHasAttributes(body, "option", map[string]string{"value": "jellyfin"}) ||
+		!htmlElementHasAttributes(body, "option", map[string]string{"value": "emby"}) ||
+		htmlElementHasAttributes(body, "input", map[string]string{"name": "provider"}) ||
+		!htmlElementHasAttributes(body, "input", map[string]string{
+			"name":     "public_url",
+			"value":    "http://example.com",
+			"required": "",
+		}) {
 		t.Fatalf("setup form is incomplete:\n%s", getRR.Body.String())
 	}
 
