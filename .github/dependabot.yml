@@ -6,18 +6,18 @@ updates:
       interval: weekly
     groups:
       go-dependencies:
-        patterns: ["*"]
+        patterns: [ "*" ]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     groups:
       github-actions:
-        patterns: ["*"]
+        patterns: [ "*" ]
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
     groups:
       container-images:
-        patterns: ["*"]
+        patterns: [ "*" ]

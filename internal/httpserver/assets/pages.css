@@ -1,42 +1,116 @@
 body.auth-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow-x: hidden;
-  background:
-    radial-gradient(circle at 50% -8rem, rgba(94, 234, 212, .14), transparent 26rem),
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    background: radial-gradient(circle at 50% -8rem, rgba(94, 234, 212, .14), transparent 26rem),
     radial-gradient(circle at 100% 100%, rgba(251, 191, 36, .05), transparent 24rem),
     var(--bg);
 }
 
 .auth-page {
-  width: 100%;
-  max-width: none;
-  min-height: 100vh;
-  min-height: 100dvh;
-  margin: 0;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
-  background: transparent;
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    min-height: 100dvh;
+    margin: 0;
+    display: grid;
+    place-items: center;
+    padding: 32px 16px;
+    background: transparent;
 }
-.auth-wrap { width: min(100%, 440px); margin: 0 auto; }
-.auth-wrap .panel, .join-card {
-  padding: 30px;
-  border-color: #334256;
-  box-shadow: var(--shadow);
-}
-.auth-page h1 { margin-bottom: 10px; font-size: 34px; }
-.auth-page form { max-width: none; margin-top: 20px; }
-.auth-page button { margin-top: 2px; }
-.join-wrap { width: min(100%, 520px); margin: 0 auto; }
-.join-card p { margin-top: 0; }
-.join-card .notice { margin: 18px 0 0; }
-.join-card .guide-actions { margin: 22px 0 0; }
 
-.public-wrap { max-width: 980px; margin: 30px auto; display: grid; grid-template-columns: minmax(0, .9fr) minmax(320px, 1fr); gap: 22px; align-items: stretch; }
-.public-side { background: linear-gradient(145deg, #102d2b, #151b24 62%, #0b1117); color: #fff; border: 1px solid #254154; border-radius: 8px; padding: 26px; min-height: 420px; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow); }
-.public-side p, .public-side .hint { color: #b9d5df; }
-.public-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 24px; box-shadow: var(--shadow); }
-.check-list { display: grid; gap: 10px; padding: 0; margin: 18px 0 0; list-style: none; }
-.check-list li { display: flex; gap: 8px; color: #e8f7fb; }
-.check-list li::before { content: "✓"; font-weight: 800; color: var(--accent); }
+.auth-wrap {
+    width: min(100%, 440px);
+    margin: 0 auto;
+}
+
+.auth-wrap .panel, .join-card {
+    padding: 30px;
+    border-color: #334256;
+    box-shadow: var(--shadow);
+}
+
+.auth-page h1 {
+    margin-bottom: 10px;
+    font-size: 34px;
+}
+
+.auth-page form {
+    max-width: none;
+    margin-top: 20px;
+}
+
+.auth-page button {
+    margin-top: 2px;
+}
+
+.join-wrap {
+    width: min(100%, 520px);
+    margin: 0 auto;
+}
+
+.join-card p {
+    margin-top: 0;
+}
+
+.join-card .notice {
+    margin: 18px 0 0;
+}
+
+.join-card .guide-actions {
+    margin: 22px 0 0;
+}
+
+.public-wrap {
+    max-width: 980px;
+    margin: 30px auto;
+    display: grid;
+    grid-template-columns: minmax(0, .9fr) minmax(320px, 1fr);
+    gap: 22px;
+    align-items: stretch;
+}
+
+.public-side {
+    background: linear-gradient(145deg, #102d2b, #151b24 62%, #0b1117);
+    color: #fff;
+    border: 1px solid #254154;
+    border-radius: 8px;
+    padding: 26px;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: var(--shadow);
+}
+
+.public-side p, .public-side .hint {
+    color: #b9d5df;
+}
+
+.public-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+}
+
+.check-list {
+    display: grid;
+    gap: 10px;
+    padding: 0;
+    margin: 18px 0 0;
+    list-style: none;
+}
+
+.check-list li {
+    display: flex;
+    gap: 8px;
+    color: #e8f7fb;
+}
+
+.check-list li::before {
+    content: "✓";
+    font-weight: 800;
+    color: var(--accent);
+}

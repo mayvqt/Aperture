@@ -7,7 +7,8 @@
 
 Aperture is a small Jellyfin and Emby invite-registration app.
 
-Admins sign in with their media-server credentials, create invite links, and choose a user-policy template. Invite recipients open a link, create an account on the configured server, and Aperture applies the selected template.
+Admins sign in with their media-server credentials, create invite links, and choose a user-policy template. Invite
+recipients open a link, create an account on the configured server, and Aperture applies the selected template.
 
 ## Docs
 
@@ -24,7 +25,6 @@ Admins sign in with their media-server credentials, create invite links, and cho
 docker compose up --build
 ```
 
-Open `http://localhost:8099`, complete browser setup, then sign in with a
-media-server administrator account.
+Open `http://localhost:8099`, complete browser setup, then sign in with a media-server administrator account.
 
 The codebase intentionally uses server-rendered HTML, SQLite, and a small provider-aware media-server client.

@@ -2,34 +2,34 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aperture</title>
-  <link rel="stylesheet" href="/assets/app.css">
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Aperture</title>
+    <link href="/assets/app.css" rel="stylesheet">
 </head>
 <body>
 <header>
-  <a class="brand" href="/admin"><span>Aperture</span></a>
-  <nav>
-    {{if .Session}}
-    <a href="/admin">Dashboard</a>
-    <a href="/admin/invites">Invites</a>
-    <a href="/admin/templates">Templates</a>
-    <a href="/admin/registrations">Registrations</a>
-    <a href="/admin/settings">Settings</a>
-    <form class="logout-form" method="post" action="/logout">
-      <input type="hidden" name="csrf" value="{{.CSRF}}">
-      <button>Log out</button>
-    </form>
-    {{end}}
-  </nav>
+    <a class="brand" href="/admin"><span>Aperture</span></a>
+    <nav>
+        {{if .Session}}
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/invites">Invites</a>
+        <a href="/admin/templates">Templates</a>
+        <a href="/admin/registrations">Registrations</a>
+        <a href="/admin/settings">Settings</a>
+        <form action="/logout" class="logout-form" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <button>Log out</button>
+        </form>
+        {{end}}
+    </nav>
 </header>
 <main>
-{{end}}
+    {{end}}
 
-{{define "base-end"}}
+    {{define "base-end"}}
 </main>
-<script src="/assets/app.js" defer></script>
+<script defer src="/assets/app.js"></script>
 </body>
 </html>
 {{end}}
@@ -38,16 +38,16 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aperture</title>
-  <link rel="stylesheet" href="/assets/app.css">
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1" name="viewport">
+    <title>Aperture</title>
+    <link href="/assets/app.css" rel="stylesheet">
 </head>
 <body class="auth-shell">
 <main class="auth-page">
-{{end}}
+    {{end}}
 
-{{define "auth-end"}}
+    {{define "auth-end"}}
 </main>
 </body>
 </html>

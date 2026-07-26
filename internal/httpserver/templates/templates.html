@@ -1,108 +1,131 @@
-{{define "templates"}}{{template "base-start" .}}<div class="page-head">
-<div>
-<p class="eyebrow">Permission presets</p>
-<h1>Templates</h1>
-<p>Import a media-server user once, then reuse those permissions for invite links.</p>
-</div>
-</div>{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<section class="split">
-<div class="panel">
-<h2>Create</h2>
-<form method="post" action="/admin/templates">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<label>Name<input name="name" maxlength="80" required>
-</label>
-<label>Description<input name="description" maxlength="180">
-</label>
-<label>Policy JSON<textarea name="policy_json">{ "IsAdministrator": false }</textarea>
-</label>
-<button>Create</button>
-</form>
-</div>
-<div class="panel">
-<h2>Import</h2>
-<form method="post" action="/admin/templates/import-from-user">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<label>Template name<input name="name" maxlength="80" required>
-</label>
-<label>Description<input name="description" maxlength="180">
-</label>
-<label>Media-server username or ID<input name="external_user_id" required>
-</label>
-<button>Import</button>
-</form>
-</div>
+{{define "templates"}}{{template "base-start" .}}
+<div class="page-head">
+    <div>
+        <p class="eyebrow">Permission presets</p>
+        <h1>Templates</h1>
+        <p>Import a media-server user once, then reuse those permissions for invite links.</p>
+    </div>
+</div>{{if .Error}}
+<div class="notice error">{{.Error}}</div>{{end}}
+<section class="split">
+    <div class="panel">
+        <h2>Create</h2>
+        <form action="/admin/templates" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Name<input maxlength="80" name="name" required>
+            </label>
+            <label>Description<input maxlength="180" name="description">
+            </label>
+            <label>Policy JSON<textarea name="policy_json">{ "IsAdministrator": false }</textarea>
+            </label>
+            <button>Create</button>
+        </form>
+    </div>
+    <div class="panel">
+        <h2>Import</h2>
+        <form action="/admin/templates/import-from-user" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Template name<input maxlength="80" name="name" required>
+            </label>
+            <label>Description<input maxlength="180" name="description">
+            </label>
+            <label>Media-server username or ID<input name="external_user_id" required>
+            </label>
+            <button>Import</button>
+        </form>
+    </div>
 </section>
 <h2>Existing</h2>
 <div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>Name</th>
-<th>Description</th>
-<th>Policy summary</th>
-<th>Actions</th>
-</tr>
-</thead>
-<tbody>{{range .Templates}}<tr>
-<td>{{.Name}}{{if .IsDefault}} <span class="status good">Default</span>{{end}}</td>
-<td>{{.Description}}</td>
-<td><div class="summary-pills">{{range templateSummary .}}<span><strong>{{.Label}}</strong> {{.Value}}</span>{{end}}</div></td>
-<td>
-<div class="row-actions">
-<a class="button secondary" href="/admin/templates/{{.ID}}">View</a>
-{{if not .IsDefault}}<form method="post" action="/admin/templates/{{.ID}}/default">
-<input type="hidden" name="csrf" value="{{$.CSRF}}">
-<button class="secondary small">Set default</button>
-</form>
-<form method="post" action="/admin/templates/{{.ID}}/delete">
-<input type="hidden" name="csrf" value="{{$.CSRF}}">
-<button class="danger small">Delete</button>
-</form>{{end}}
-</div>
-</td>
-</tr>{{else}}<tr>
-<td colspan="4">No templates yet.</td>
-</tr>{{end}}</tbody>
-</table>
+    <table>
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Policy summary</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>{{range .Templates}}
+        <tr>
+            <td>{{.Name}}{{if .IsDefault}} <span class="status good">Default</span>{{end}}</td>
+            <td>{{.Description}}</td>
+            <td>
+                <div class="summary-pills">{{range templateSummary
+                    .}}<span><strong>{{.Label}}</strong> {{.Value}}</span>{{end}}
+                </div>
+            </td>
+            <td>
+                <div class="row-actions">
+                    <a class="button secondary" href="/admin/templates/{{.ID}}">View</a>
+                    {{if not .IsDefault}}
+                    <form action="/admin/templates/{{.ID}}/default" method="post">
+                        <input name="csrf" type="hidden" value="{{$.CSRF}}">
+                        <button class="secondary small">Set default</button>
+                    </form>
+                    <form action="/admin/templates/{{.ID}}/delete" method="post">
+                        <input name="csrf" type="hidden" value="{{$.CSRF}}">
+                        <button class="danger small">Delete</button>
+                    </form>
+                    {{end}}
+                </div>
+            </td>
+        </tr>
+        {{else}}
+        <tr>
+            <td colspan="4">No templates yet.</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
 </div>{{template "base-end" .}}{{end}}
-{{define "template-detail"}}{{template "base-start" .}}<div class="page-head">
-<div>
-<h1>{{.Template.Name}}{{if .Template.IsDefault}} <span class="status good">Default</span>{{end}}</h1>
-<p>{{.Template.Description}}</p>
-</div>
-<div class="actions">
-<a class="button secondary" href="/admin/templates">All templates</a>
-{{if not .Template.IsDefault}}<form method="post" action="/admin/templates/{{.Template.ID}}/default">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<button class="secondary">Set default</button>
-</form>
-<form method="post" action="/admin/templates/{{.Template.ID}}/delete">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<button class="danger">Delete</button>
-</form>{{end}}
-</div>
-</div>{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<section class="split">
-<div class="panel">
-<h2>Edit</h2>
-<form method="post" action="/admin/templates/{{.Template.ID}}">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<label>Name<input name="name" value="{{.Template.Name}}" maxlength="80" required>
-</label>
-<label>Description<input name="description" value="{{.Template.Description}}" maxlength="180">
-</label>
-<label>Policy JSON<textarea name="policy_json" required>{{textareaJSON .Template.PolicyJSON "{}"}}</textarea>
-</label>
-<button>Save</button>
-</form>
-</div>
-<div class="panel">
-<h2>Policy summary</h2>
-<div class="summary-list">{{range templateSummary .Template}}<div>
-<span>{{.Label}}</span>
-<strong>{{.Value}}</strong>
-</div>{{end}}</div>
-<h2>Preview</h2>
-<h3>Policy</h3>
-<pre>{{.Template.PolicyJSON}}</pre>
-</div>
+{{define "template-detail"}}{{template "base-start" .}}
+<div class="page-head">
+    <div>
+        <h1>{{.Template.Name}}{{if .Template.IsDefault}} <span class="status good">Default</span>{{end}}</h1>
+        <p>{{.Template.Description}}</p>
+    </div>
+    <div class="actions">
+        <a class="button secondary" href="/admin/templates">All templates</a>
+        {{if not .Template.IsDefault}}
+        <form action="/admin/templates/{{.Template.ID}}/default" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <button class="secondary">Set default</button>
+        </form>
+        <form action="/admin/templates/{{.Template.ID}}/delete" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <button class="danger">Delete</button>
+        </form>
+        {{end}}
+    </div>
+</div>{{if .Error}}
+<div class="notice error">{{.Error}}</div>{{end}}
+<section class="split">
+    <div class="panel">
+        <h2>Edit</h2>
+        <form action="/admin/templates/{{.Template.ID}}" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Name<input maxlength="80" name="name" required value="{{.Template.Name}}">
+            </label>
+            <label>Description<input maxlength="180" name="description" value="{{.Template.Description}}">
+            </label>
+            <label>Policy JSON<textarea name="policy_json"
+                                        required>{{textareaJSON .Template.PolicyJSON "{}"}}</textarea>
+            </label>
+            <button>Save</button>
+        </form>
+    </div>
+    <div class="panel">
+        <h2>Policy summary</h2>
+        <div class="summary-list">{{range templateSummary .Template}}
+            <div>
+                <span>{{.Label}}</span>
+                <strong>{{.Value}}</strong>
+            </div>
+            {{end}}
+        </div>
+        <h2>Preview</h2>
+        <h3>Policy</h3>
+        <pre>{{.Template.PolicyJSON}}</pre>
+    </div>
 </section>{{template "base-end" .}}{{end}}

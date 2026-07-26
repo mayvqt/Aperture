@@ -1,6 +1,7 @@
 # Contributing
 
-Aperture is a focused Go service for Jellyfin and Emby invitations. Keep changes small, secure, and within that product boundary.
+Aperture is a focused Go service for Jellyfin and Emby invitations. Keep changes small, secure, and within that product
+boundary.
 
 ## Local development
 

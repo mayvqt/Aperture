@@ -6,9 +6,8 @@ Run locally:
 go run ./cmd/aperture serve
 ```
 
-Open `http://localhost:8099/setup`. Go does not load `.env` files itself; the
-example file is for Docker Compose or for values explicitly exported by your
-shell.
+Open `http://localhost:8099/setup`. Go does not load `.env` files itself; the example file is for Docker Compose or for
+values explicitly exported by your shell.
 
 Required checks:
 
@@ -32,5 +31,5 @@ Package responsibilities:
 - `internal/mediaserver/jellyfin` and `emby`: isolated provider adapters and tests.
 - `internal/security`: tokens, hashing, encryption, and redaction.
 
-Keep provider-specific protocol behavior out of handlers and persistence code.
-Schema changes update the canonical schema revision and require fresh-init tests.
+Keep provider-specific protocol behavior out of handlers and persistence code. Schema changes update the canonical
+schema revision and require fresh-init tests.

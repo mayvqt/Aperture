@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/mayvqt/aperture/internal/db"
 	"html/template"
 	"time"
+
+	"github.com/mayvqt/aperture/internal/db"
 )
 
 type templateSummaryItem struct {

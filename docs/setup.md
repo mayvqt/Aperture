@@ -11,5 +11,5 @@
 4. Sign in with a media-server administrator account.
 5. Import or create a non-administrator template, then create an invite.
 
-Standalone installs can run `aperture serve` and use the same browser setup.
-Secrets are generated automatically and stored under the config directory.
+Standalone installs can run `aperture serve` and use the same browser setup. Secrets are generated automatically and
+stored under the config directory.

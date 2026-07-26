@@ -1,30 +1,110 @@
 @media (max-width: 920px) {
-  header { align-items: flex-start; flex-direction: column; }
-  main { padding: 22px 16px 46px; }
-  .page-head { flex-direction: column; }
-  .grid, .grid.four, .split, .public-wrap, .settings-grid, .form-grid { grid-template-columns: 1fr; }
-  .form-grid .span-2 { grid-column: auto; }
-  .public-side { min-height: auto; }
+    header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    main {
+        padding: 22px 16px 46px;
+    }
+
+    .page-head {
+        flex-direction: column;
+    }
+
+    .grid, .grid.four, .split, .public-wrap, .settings-grid, .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid .span-2 {
+        grid-column: auto;
+    }
+
+    .public-side {
+        min-height: auto;
+    }
 }
 
 @media (max-width: 620px) {
-  body { font-size: 14px; }
-  header { padding: 12px 16px; }
-  nav { width: 100%; }
-  nav a, nav button, .logout-form button { padding: 8px 9px; }
-  h1 { font-size: 28px; }
-  .auth-page { padding: 22px 12px; align-items: start; }
-  .auth-wrap .panel, .join-card { padding: 22px; }
-  .auth-page h1 { font-size: 30px; }
-  .page-head .button, .page-head button { width: 100%; text-align: center; }
-  .actions { width: 100%; }
-  .actions .button, .actions button { flex: 1 1 auto; text-align: center; }
-  .copy-row, .invite-link-cell { grid-template-columns: 1fr; }
-  .invite-card-head { align-items: stretch; }
-  .invite-card .invite-link-cell { grid-template-columns: 1fr; }
-  .row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .row-actions form, .row-actions button { width: 100%; }
-  .health { align-items: stretch; flex-direction: column; }
-  .health .button { width: 100%; text-align: center; }
-  .summary-list { grid-template-columns: 1fr; }
+    body {
+        font-size: 14px;
+    }
+
+    header {
+        padding: 12px 16px;
+    }
+
+    nav {
+        width: 100%;
+    }
+
+    nav a, nav button, .logout-form button {
+        padding: 8px 9px;
+    }
+
+    h1 {
+        font-size: 28px;
+    }
+
+    .auth-page {
+        padding: 22px 12px;
+        align-items: start;
+    }
+
+    .auth-wrap .panel, .join-card {
+        padding: 22px;
+    }
+
+    .auth-page h1 {
+        font-size: 30px;
+    }
+
+    .page-head .button, .page-head button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .actions {
+        width: 100%;
+    }
+
+    .actions .button, .actions button {
+        flex: 1 1 auto;
+        text-align: center;
+    }
+
+    .copy-row, .invite-link-cell {
+        grid-template-columns: 1fr;
+    }
+
+    .invite-card-head {
+        align-items: stretch;
+    }
+
+    .invite-card .invite-link-cell {
+        grid-template-columns: 1fr;
+    }
+
+    .row-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .row-actions form, .row-actions button {
+        width: 100%;
+    }
+
+    .health {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .health .button {
+        width: 100%;
+        text-align: center;
+    }
+
+    .summary-list {
+        grid-template-columns: 1fr;
+    }
 }

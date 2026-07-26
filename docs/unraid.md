@@ -1,8 +1,7 @@
 # Unraid
 
-Map `/mnt/user/appdata/aperture` to `/config`, expose container port `8099`,
-then open `http://<unraid-address>:8099/setup`. Browser setup works on Unraid;
-no Aperture environment variables are required.
+Map `/mnt/user/appdata/aperture` to `/config`, expose container port `8099`, then open
+`http://<unraid-address>:8099/setup`. Browser setup works on Unraid; no Aperture environment variables are required.
 
 ## Optional variables
 
@@ -25,12 +24,10 @@ APERTURE_SESSION_SECRET=
 APERTURE_INVITE_SECRET=
 ```
 
-`PUID`, `PGID`, and `UMASK` default to the values shown. Leave the application
-settings blank to manage them in the browser. Setting one by environment makes
-that field deployment-managed. Use `emby` instead of `jellyfin` when needed.
+`PUID`, `PGID`, and `UMASK` default to the values shown. Leave the application settings blank to manage them in the
+browser. Setting one by environment makes that field deployment-managed. Use `emby` instead of `jellyfin` when needed.
 
-Use the media-server container name when both containers share a Docker network.
-Behind a reverse proxy, set `APERTURE_TRUSTED_PROXY_CIDRS` only to the network
-that directly connects the proxy to Aperture.
+Use the media-server container name when both containers share a Docker network. Behind a reverse proxy, set
+`APERTURE_TRUSTED_PROXY_CIDRS` only to the network that directly connects the proxy to Aperture.
 
 Back up `/mnt/user/appdata/aperture` and treat it as sensitive.

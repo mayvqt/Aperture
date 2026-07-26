@@ -1,49 +1,71 @@
-{{define "setup"}}{{template "auth-start" .}}<section class="auth-wrap">
-<div class="auth-brand">Aperture</div>
-<div class="panel">
-<p class="eyebrow">First run</p>
-<h1>Set up Aperture</h1>{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<form method="post" action="/setup">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select name="provider"{{if .ProviderManaged}} disabled{{end}}>
-<option value="jellyfin" {{if eq .Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
-<option value="emby" {{if eq .Provider "emby"}}selected{{end}}>Emby</option>
-</select>
-</label>
-<label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span class="hint">The address people will use to open invite links.</span>{{end}}<input name="public_url" value="{{.PublicURL}}" placeholder="https://invites.example.com" required{{if .PublicURLManaged}} disabled{{end}}>
-</label>
-<label>Media-server URL{{if .ServerURLManaged}}<span class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input name="server_url" value="{{.ServerURL}}" placeholder="http://media-server:8096" required{{if .ServerURLManaged}} disabled{{end}}>
-</label>
-<label>API key{{if .APIKeyManaged}}<span class="hint">Managed by APERTURE_API_KEY.</span>{{end}}<input type="password" name="api_key" autocomplete="off"{{if .APIKeyManaged}} disabled{{end}}>
-</label>
-<button>Save and continue</button>
-</form>
-</div>
+{{define "setup"}}{{template "auth-start" .}}
+<section class="auth-wrap">
+    <div class="auth-brand">Aperture</div>
+    <div class="panel">
+        <p class="eyebrow">First run</p>
+        <h1>Set up Aperture</h1>{{if .Error}}
+        <div class="notice error">{{.Error}}</div>
+        {{end}}
+        <form action="/setup" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select
+                    .ProviderManaged}} disabled{{end}} name="provider" {{if>
+                <option .Provider eq value="jellyfin" {{if
+                "jellyfin"}}selected{{end}}>Jellyfin</option>
+                <option .Provider eq value="emby" {{if
+                "emby"}}selected{{end}}>Emby</option>
+            </select>
+            </label>
+            <label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span
+                    class="hint">The address people will use to open invite links.</span>{{end}}<input .PublicURLManaged}}
+                                                                                                       disabled{{end}}
+                                                                                                       name="public_url"
+                                                                                                       placeholder="https://invites.example.com"
+                                                                                                       required{{if
+                                                                                                       value="{{.PublicURL}}">
+            </label>
+            <label>Media-server URL{{if .ServerURLManaged}}<span class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input
+                    .ServerURLManaged}} disabled{{end}} name="server_url" placeholder="http://media-server:8096"
+                    required{{if value="{{.ServerURL}}">
+            </label>
+            <label>API key{{if .APIKeyManaged}}<span class="hint">Managed by APERTURE_API_KEY.</span>{{end}}<input
+                    .APIKeyManaged}} autocomplete="off" disabled{{end}} name="api_key" type="password" {{if>
+            </label>
+            <button>Save and continue</button>
+        </form>
+    </div>
 </section>{{template "auth-end" .}}{{end}}
-{{define "login"}}{{template "auth-start" .}}<section class="auth-wrap">
-<div class="auth-brand">Aperture</div>
-<div class="panel">
-<p class="eyebrow">{{.ServerName}} administrator</p>
-<h1>Sign in</h1>{{if .Error}}<div class="notice error">{{.Error}}</div>{{end}}<form method="post" action="/login">
-<input type="hidden" name="csrf" value="{{.CSRF}}">
-<label>Username<input name="username" autocomplete="username" required autofocus>
-</label>
-<label>Password<input type="password" name="password" autocomplete="current-password" required>
-</label>
-<button>Log in</button>
-</form>
-</div>
+{{define "login"}}{{template "auth-start" .}}
+<section class="auth-wrap">
+    <div class="auth-brand">Aperture</div>
+    <div class="panel">
+        <p class="eyebrow">{{.ServerName}} administrator</p>
+        <h1>Sign in</h1>{{if .Error}}
+        <div class="notice error">{{.Error}}</div>
+        {{end}}
+        <form action="/login" method="post">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Username<input autocomplete="username" autofocus name="username" required>
+            </label>
+            <label>Password<input autocomplete="current-password" name="password" required type="password">
+            </label>
+            <button>Log in</button>
+        </form>
+    </div>
 </section>{{template "auth-end" .}}{{end}}
-{{define "success"}}{{template "auth-start" .}}<section class="auth-wrap">
-<div class="auth-brand">Aperture</div>
-<div class="panel">
-<h1>Account created</h1>
-<p class="muted">You can now sign in to your media server.</p>
-</div>
+{{define "success"}}{{template "auth-start" .}}
+<section class="auth-wrap">
+    <div class="auth-brand">Aperture</div>
+    <div class="panel">
+        <h1>Account created</h1>
+        <p class="muted">You can now sign in to your media server.</p>
+    </div>
 </section>{{template "auth-end" .}}{{end}}
-{{define "message"}}{{template "auth-start" .}}<section class="auth-wrap">
-<div class="auth-brand">Aperture</div>
-<div class="panel">
-<h1>{{.Title}}</h1>
-<p>{{.Message}}</p>
-</div>
+{{define "message"}}{{template "auth-start" .}}
+<section class="auth-wrap">
+    <div class="auth-brand">Aperture</div>
+    <div class="panel">
+        <h1>{{.Title}}</h1>
+        <p>{{.Message}}</p>
+    </div>
 </section>{{template "auth-end" .}}{{end}}
