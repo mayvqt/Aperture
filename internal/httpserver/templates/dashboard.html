@@ -175,7 +175,6 @@
             <th>Ended</th>
             <th>Attempts</th>
             <th>Retry</th>
-            <th>Notes</th>
             <th>Action</th>
             <th>Created</th>
         </tr>
@@ -191,7 +190,6 @@
             <td>{{nullDate .UserDisabledAt}}</td>
             <td>{{.DisableAttempts}}</td>
             <td>{{nullDateTime .NextDisableAttemptAt}}</td>
-            <td>{{.ErrorMessage.String}}</td>
             <td>{{if canRetryTemplate .Status .ExternalUserID}}
                 <form action="/admin/registrations/{{.ID}}/retry-template" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
@@ -203,7 +201,7 @@
         </tr>
         {{else}}
         <tr>
-            <td colspan="10">No registrations yet.</td>
+            <td colspan="9">No registrations yet.</td>
         </tr>
         {{end}}
         </tbody>

@@ -68,10 +68,11 @@ func TestRegistrationsPageShowsTemplateRecoveryAction(t *testing.T) {
 	) {
 		t.Fatalf("registration retry form missing CSRF input:\n%s", body)
 	}
-	for _, want := range []string{"Retry access", "policy failed"} {
-		if !strings.Contains(rr.Body.String(), want) {
-			t.Fatalf("body missing %q:\n%s", want, rr.Body.String())
-		}
+	if !strings.Contains(body, "Retry access") {
+		t.Fatalf("body missing recovery action:\n%s", body)
+	}
+	if strings.Contains(body, "policy failed") {
+		t.Fatalf("page exposed persisted diagnostic text:\n%s", body)
 	}
 }
 

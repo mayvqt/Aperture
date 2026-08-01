@@ -20,7 +20,7 @@ func NormalizeBaseURL(provider Provider, baseURL string) (string, error) {
 	}
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return "", err
+		return "", errors.New("media-server URL is invalid")
 	}
 	if u.Host == "" {
 		return "", errors.New("media-server URL is missing a host")

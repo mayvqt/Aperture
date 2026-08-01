@@ -89,7 +89,7 @@ func (s *Server) session(r *http.Request) (db.Session, bool, error) {
 	return session, true, nil
 }
 func (s *Server) data(_ *http.Request, session db.Session) viewData {
-	return viewData{Session: &session, CSRF: session.CSRFSecret}
+	return viewData{Session: &sessionView{Username: session.Username}, CSRF: session.CSRFSecret}
 }
 func (s *Server) validCSRF(r *http.Request, expected string) bool {
 	actual, ok := formCSRF(r)

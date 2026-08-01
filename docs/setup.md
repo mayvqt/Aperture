@@ -13,3 +13,6 @@
 
 Standalone installs can run `aperture serve` and use the same browser setup. Secrets are generated automatically and
 stored under the config directory.
+
+Complete the first-run setup from a trusted network before publishing Aperture through a reverse proxy. Until setup is
+saved, `/setup` is intentionally unauthenticated because no administrator session can exist yet.

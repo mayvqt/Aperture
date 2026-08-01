@@ -22,4 +22,3 @@ tmp
 !.env.example
 *.md
 docker-compose.yml
-docker-compose.yml

@@ -96,7 +96,7 @@ func Load(args []string) (Config, error) {
 	if cfg.PublicURL != "" {
 		u, err := url.Parse(cfg.PublicURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			return Config{}, fmt.Errorf("invalid public URL %q", cfg.PublicURL)
+			return Config{}, fmt.Errorf("invalid APERTURE_PUBLIC_URL")
 		}
 		if u.Scheme != "http" && u.Scheme != "https" {
 			return Config{}, fmt.Errorf("public URL must start with http:// or https://")

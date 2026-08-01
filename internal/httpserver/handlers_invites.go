@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -26,7 +25,6 @@ func (s *Server) invitesList(w http.ResponseWriter, r *http.Request, session db.
 	data := s.data(r, session)
 	data.Invites = invites
 	data.InviteRows = inviteRows(invites, activity)
-	data.NewURL = r.URL.Query().Get("created")
 	_, publicURL, _ := s.runtimeSettings()
 	data.PublicURL = strings.TrimRight(publicURL, "/")
 	data.Stats = dashboardStatsFrom(invites, nil)
@@ -106,11 +104,10 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 		s.error(w, err)
 		return
 	}
-	inviteURL := s.publicURL("/i/" + token)
 	if err := s.store.Audit(r.Context(), session.UserID, "invite.create", "invite", strconv.FormatInt(inviteID, 10), clientIP(r, s.trustedProxies), requestUserAgent(r), "{}"); err != nil {
 		slog.Warn("could not record invite creation audit event", "error", safeError(err))
 	}
-	http.Redirect(w, r, "/admin/invites?created="+url.QueryEscape(inviteURL), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 func (s *Server) invitesDisable(w http.ResponseWriter, r *http.Request, _ db.Session) {
 	s.setInviteState(w, r, false)

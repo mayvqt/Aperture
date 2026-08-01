@@ -152,12 +152,13 @@ func (c *Client) DoJSONForDevice(ctx context.Context, baseURL, method, requestPa
 		return err
 	}
 	var reader io.Reader
+	var requestData []byte
 	if body != nil {
-		data, err := json.Marshal(body)
+		requestData, err = json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		reader = bytes.NewReader(data)
+		reader = bytes.NewReader(requestData)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
@@ -177,7 +178,10 @@ func (c *Client) DoJSONForDevice(ctx context.Context, baseURL, method, requestPa
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("send media-server request: %w", ctxErr)
+		}
+		return errors.New("send media-server request failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

@@ -193,6 +193,37 @@ func TestSettingsNeverRendersAPIKey(t *testing.T) {
 	}
 }
 
+func TestSettingsViewModelExcludesAllBackendSecrets(t *testing.T) {
+	store := newFakeStore()
+	store.settings.APIKey = "stored-api-key-never-render"
+	store.settings.SessionSecret = "stored-session-secret-never-render"
+	store.settings.InviteSecret = "stored-invite-secret-never-render"
+	store.session.AccessToken = "admin-access-token-never-render"
+	store.session.DeviceID = "admin-device-id-never-render"
+	cfg := testConfig()
+	cfg.APIKey = "environment-api-key-never-render"
+	handler := New(cfg, store, &fakeMediaServer{})
+
+	req := adminRequest(t, http.MethodGet, "/admin/settings", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want 200; body %s", rr.Code, rr.Body.String())
+	}
+	for _, secret := range []string{
+		store.settings.APIKey,
+		store.settings.SessionSecret,
+		store.settings.InviteSecret,
+		store.session.AccessToken,
+		store.session.DeviceID,
+		cfg.APIKey,
+	} {
+		if strings.Contains(rr.Body.String(), secret) {
+			t.Fatalf("settings response exposed backend secret %q", secret)
+		}
+	}
+}
+
 func TestSettingsPostWritesOnlyUIManagedValues(t *testing.T) {
 	tests := []struct {
 		name       string

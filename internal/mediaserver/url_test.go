@@ -1,6 +1,9 @@
 package mediaserver
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNormalizeBaseURLByProvider(t *testing.T) {
 	tests := []struct {
@@ -33,6 +36,17 @@ func TestNormalizeBaseURLRejectsUnsafeParts(t *testing.T) {
 				t.Fatal("unsafe URL was accepted")
 			}
 		})
+	}
+}
+
+func TestNormalizeBaseURLParseErrorDoesNotEchoInput(t *testing.T) {
+	const input = "https://media.test/\n?api_key=url-secret"
+	_, err := NormalizeBaseURL(ProviderJellyfin, input)
+	if err == nil {
+		t.Fatal("expected invalid URL to fail")
+	}
+	if strings.Contains(err.Error(), "url-secret") || strings.Contains(err.Error(), input) {
+		t.Fatalf("URL error exposed input: %q", err)
 	}
 }
 

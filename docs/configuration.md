@@ -38,4 +38,6 @@ only the CIDRs of proxies that directly connect to Aperture.
 ## Storage
 
 SQLite state lives in the config directory: `/config/aperture.db` in Docker or
-`./data/aperture.db` standalone. If startup reports an unsupported database schema, remove the database and restart.
+`./data/aperture.db` standalone. If startup reports an unsupported database schema, preserve the entire config directory
+and verify that the running Aperture version supports that schema before changing anything. Do not delete the database
+as a normal upgrade step.

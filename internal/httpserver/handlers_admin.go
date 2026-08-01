@@ -38,7 +38,7 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, session db
 		return
 	}
 	data := s.data(r, session)
-	data.Settings = settings
+	data.Settings = safeSettingsView(settings)
 	s.setMediaViewData(&data)
 	render(w, "settings", data)
 }
@@ -160,7 +160,15 @@ func (s *Server) setMediaViewData(data *viewData) {
 func (s *Server) renderSettingsError(w http.ResponseWriter, r *http.Request, session db.Session, provider, publicURL, serverURL, message string) {
 	data := s.data(r, session)
 	data.Error = message
-	data.Settings = db.Settings{Provider: provider, PublicURL: publicURL, ServerURL: serverURL}
+	data.Settings = settingsView{Provider: provider, PublicURL: publicURL, ServerURL: serverURL}
 	s.setMediaViewData(&data)
 	render(w, "settings", data)
+}
+
+func safeSettingsView(settings db.Settings) settingsView {
+	return settingsView{
+		Provider:  settings.Provider,
+		PublicURL: settings.PublicURL,
+		ServerURL: settings.ServerURL,
+	}
 }

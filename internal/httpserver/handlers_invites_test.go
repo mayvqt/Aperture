@@ -11,7 +11,7 @@ import (
 func TestInvitesListShowsSavedCopyButtons(t *testing.T) {
 	store := newFakeStore()
 	handler := New(testConfig(), store, &fakeMediaServer{})
-	req := adminRequest(t, http.MethodGet, "/admin/invites?created="+url.QueryEscape("https://aperture.example/i/raw-token"), nil)
+	req := adminRequest(t, http.MethodGet, "/admin/invites", nil)
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -20,7 +20,7 @@ func TestInvitesListShowsSavedCopyButtons(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	for _, want := range []string{`data-copy="new-invite-url"`, "https://aperture.example/i/raw-token", `data-copy="invite-url-1"`, "https://aperture.example/i/saved-token", "account access", "alice", "Duplicate"} {
+	for _, want := range []string{`data-copy="invite-url-1"`, "https://aperture.example/i/saved-token", "account access", "alice", "Duplicate"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body missing %q:\n%s", want, body)
 		}
@@ -72,7 +72,7 @@ func TestInvitesNewIgnoresMissingPreset(t *testing.T) {
 	}
 }
 
-func TestInvitesCreateStoresUserExpiryDaysAndRedirectsWithRawURL(t *testing.T) {
+func TestInvitesCreateStoresUserExpiryDaysWithoutPuttingTokenInRedirect(t *testing.T) {
 	store := newFakeStore()
 	handler := New(testConfig(), store, &fakeMediaServer{})
 	form := url.Values{
@@ -99,8 +99,11 @@ func TestInvitesCreateStoresUserExpiryDaysAndRedirectsWithRawURL(t *testing.T) {
 		t.Fatal("expected raw invite token to be retained for encrypted copy links")
 	}
 	location := rr.Header().Get("Location")
-	if !strings.HasPrefix(location, "/admin/invites?created=https%3A%2F%2Faperture.example%2Fi%2F") {
-		t.Fatalf("Location = %q, want created invite URL", location)
+	if location != "/admin/invites" {
+		t.Fatalf("Location = %q, want token-free invite list URL", location)
+	}
+	if strings.Contains(location, store.createdInvite.Token) || strings.Contains(location, "%2Fi%2F") {
+		t.Fatalf("redirect exposed invite token material: %q", location)
 	}
 }
 

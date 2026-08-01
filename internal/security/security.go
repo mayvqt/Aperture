@@ -6,7 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
+	"regexp"
 	"strings"
+)
+
+var (
+	secretAssignmentPattern = regexp.MustCompile(`(?i)["']?\b(api[_ -]?key|access[_ -]?token|authorization|token|password|passwd|pw|secret)\b["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;&}]+)`)
+	bearerTokenPattern      = regexp.MustCompile(`(?i)\bbearer\s+[^\s,;&]+`)
 )
 
 func RandomToken(bytes int) (string, error) {
@@ -42,4 +48,23 @@ func Redact(value string) string {
 		return ""
 	}
 	return strings.Repeat("*", 8)
+}
+
+// RedactText removes common credential forms and any exact secret values from
+// diagnostic text before it is logged, persisted, or displayed.
+func RedactText(value string, secrets ...string) string {
+	value = bearerTokenPattern.ReplaceAllString(value, "Bearer [redacted]")
+	value = secretAssignmentPattern.ReplaceAllStringFunc(value, func(match string) string {
+		separator := strings.IndexAny(match, ":=")
+		if separator < 0 {
+			return "[redacted]"
+		}
+		return strings.TrimSpace(match[:separator]) + "=[redacted]"
+	})
+	for _, secret := range secrets {
+		if secret != "" {
+			value = strings.ReplaceAll(value, secret, "[redacted]")
+		}
+	}
+	return value
 }

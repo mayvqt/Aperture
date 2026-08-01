@@ -24,6 +24,27 @@ func TestPingReturnsTypedHTTPError(t *testing.T) {
 	}
 }
 
+func TestTransportErrorsDoNotExposeRequestSecretsOrPrivateURL(t *testing.T) {
+	const (
+		apiKey   = "transport-api-key"
+		password = "transport-password"
+		baseURL  = "http://private-media.test"
+	)
+	client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, errors.New("request " + r.URL.String() + " Authorization=" + r.Header.Get("Authorization") + " password=" + password)
+	})})
+
+	err := client.DoJSON(t.Context(), baseURL, http.MethodPost, "/Users/New", apiKey, map[string]string{"Password": password}, nil)
+	if err == nil {
+		t.Fatal("expected transport error")
+	}
+	for _, secret := range []string{apiKey, password, baseURL, "private-media.test"} {
+		if strings.Contains(err.Error(), secret) {
+			t.Fatalf("transport error exposed %q in %q", secret, err)
+		}
+	}
+}
+
 func TestAuthenticateUsesUniqueDeviceID(t *testing.T) {
 	var first string
 	client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
