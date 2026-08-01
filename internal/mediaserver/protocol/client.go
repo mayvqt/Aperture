@@ -177,7 +177,10 @@ func (c *Client) DoJSONForDevice(ctx context.Context, baseURL, method, requestPa
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("send media-server request: %w", ctxErr)
+		}
+		return errors.New("send media-server request failed")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

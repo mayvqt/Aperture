@@ -23,7 +23,6 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	setupLogger(cfg.LogLevel)
 	if err := config.EnsureEncryptionKey(&cfg); err != nil {
 		return err
 	}
@@ -44,6 +43,10 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
+	setupLogger(cfg.LogLevel,
+		cfg.APIKey, cfg.EncryptionKey, cfg.SessionSecret, cfg.InviteSecret,
+		settings.APIKey, settings.SessionSecret, settings.InviteSecret,
+	)
 	if cfg.ProviderManaged {
 		if err := store.ValidateMediaProvider(context.Background(), cfg.MediaProvider); err != nil {
 			return err

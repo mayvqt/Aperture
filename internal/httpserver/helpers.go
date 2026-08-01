@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,8 +15,6 @@ import (
 	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/security"
 )
-
-var secretLikePattern = regexp.MustCompile(`(?i)(api[_-]?key|access[_-]?token|token|password|pw|secret)=([^&\s]+)`)
 
 func (s *Server) validInvite(ctx context.Context, token string) (db.Invite, error) {
 	settings, err := s.settings(ctx)
@@ -33,10 +30,6 @@ func (s *Server) validInvite(ctx context.Context, token string) (db.Invite, erro
 		return db.Invite{}, db.ErrInviteUnavailable
 	}
 	return invite, nil
-}
-func (s *Server) publicURL(path string) string {
-	_, publicURL, _ := s.runtimeSettings()
-	return strings.TrimRight(publicURL, "/") + path
 }
 func (s *Server) serverName() string {
 	value, _, _ := s.runtimeSettings()
@@ -193,8 +186,7 @@ func safeError(err error) string {
 	if err == nil {
 		return ""
 	}
-	msg := err.Error()
-	msg = secretLikePattern.ReplaceAllString(msg, "$1=[redacted]")
+	msg := security.RedactText(err.Error())
 	if len(msg) > 240 {
 		msg = msg[:240]
 	}

@@ -1,6 +1,9 @@
 package security
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestHashTokenUsesSecret(t *testing.T) {
 	token := "invite-token"
@@ -11,6 +14,17 @@ func TestHashTokenUsesSecret(t *testing.T) {
 	}
 	if !ConstantEqual(first, HashToken("secret-one", token)) {
 		t.Fatal("same secret and token should compare equal")
+	}
+}
+
+func TestRedactTextCoversStructuredAndKnownSecrets(t *testing.T) {
+	known := "bare-known-api-key"
+	input := `api_key=one "access_token":"two" Authorization: MediaBrowser Token="three" Bearer four password='five' ` + known
+	got := RedactText(input, known)
+	for _, secret := range []string{"one", "two", "three", "four", "five", known} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("RedactText leaked %q in %q", secret, got)
+		}
 	}
 }
 

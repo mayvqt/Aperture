@@ -160,8 +160,12 @@ func TestSettingsCanRemoveSavedAPIKey(t *testing.T) {
 func TestSettingsNeverRendersAPIKey(t *testing.T) {
 	store := newFakeStore()
 	store.settings.APIKey = "ui-stored-super-secret-key"
+	store.settings.SessionSecret = "stored-session-secret-never-render"
+	store.settings.InviteSecret = "stored-invite-secret-never-render"
+	store.session.AccessToken = "admin-access-token-never-render"
+	store.session.DeviceID = "admin-device-id-never-render"
 	cfg := testConfig()
-	cfg.APIKey = ""
+	cfg.APIKey = "environment-api-key-never-render"
 	cfg.APIKeyManaged = false
 	handler := New(cfg, store, &fakeMediaServer{})
 
@@ -172,8 +176,20 @@ func TestSettingsNeverRendersAPIKey(t *testing.T) {
 		t.Fatalf("GET status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	if strings.Contains(body, store.settings.APIKey) || strings.Contains(body, "********") {
-		t.Fatalf("settings page exposed API-key material:\n%s", body)
+	for _, secret := range []string{
+		store.settings.APIKey,
+		store.settings.SessionSecret,
+		store.settings.InviteSecret,
+		store.session.AccessToken,
+		store.session.DeviceID,
+		cfg.APIKey,
+	} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("settings page exposed backend secret %q", secret)
+		}
+	}
+	if strings.Contains(body, "********") {
+		t.Fatalf("settings page rendered a secret placeholder:\n%s", body)
 	}
 	if strings.Contains(body, `name="api_key" value=`) {
 		t.Fatalf("API-key input must always be empty:\n%s", body)

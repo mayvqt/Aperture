@@ -6,14 +6,7 @@
         <p>{{.Stats.ActiveInvites}} active invite links</p>
     </div>
     <a class="button" href="/admin/invites/new">Create invite</a>
-</div>{{if .NewURL}}
-<div class="notice">
-    <strong>Invite URL</strong>
-    <div class="copy-row">
-        <code class="invite-url" id="new-invite-url">{{.NewURL}}</code>
-        <button aria-label="Copy invite URL" class="secondary" data-copy="new-invite-url" type="button">Copy</button>
-    </div>
-</div>{{end}}
+</div>
 <div class="invite-list">
     {{range .InviteRows}}
     <article class="invite-card">

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -30,5 +33,22 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	os.Args = []string{"aperture", "nope"}
 	if err := run(); err == nil {
 		t.Fatal("expected unknown command to fail")
+	}
+}
+
+func TestLoggerRedactsStructuredAndKnownSecrets(t *testing.T) {
+	var output bytes.Buffer
+	logger := newLogger(&output, "info", "bare-environment-api-key")
+	logger.Error("request failed",
+		"error", errors.New(`Authorization: Bearer header-token password="form-password" bare-environment-api-key`),
+		"detail", `{"access_token":"json-token"}`,
+	)
+	for _, secret := range []string{"header-token", "form-password", "bare-environment-api-key", "json-token"} {
+		if strings.Contains(output.String(), secret) {
+			t.Fatalf("log exposed %q in %q", secret, output.String())
+		}
+	}
+	if !strings.Contains(output.String(), "[redacted]") {
+		t.Fatalf("log did not contain redaction marker: %q", output.String())
 	}
 }

@@ -1,18 +1,13 @@
 # Security
 
-Aperture handles media-server credentials, API keys, sessions, invitation tokens, and encrypted local state.
-
 ## Reporting vulnerabilities
 
-Use GitHub's private vulnerability reporting for this repository. Do not open a public issue until a fix is available.
-Include affected versions, impact, reproduction steps, and mitigations, while removing real credentials, tokens, logs,
-and private service URLs.
+Use GitHub private vulnerability reporting. Do not open a public issue before a fix is available. Remove real secrets,
+tokens, logs, and private URLs from reports. Security fixes target the current `main` branch.
 
-## Supported versions
+API keys, media-server access tokens, session and CSRF secrets, and retained invite tokens are encrypted before database
+storage. The web UI does not return stored API keys or upstream diagnostic text. Application logs redact known secret
+forms and configured secrets.
 
-Until stable release branches exist, security fixes target the current `main` branch.
-
-## Sensitive data
-
-Treat `/config`, SQLite backups, `.env`, session cookies, invite links, media-server tokens, API keys, and diagnostic
-logs as sensitive. Use placeholders in examples and reports.
+Treat `/config`, backups, `.env`, cookies, logs, and invite links as sensitive. Disable proxy request-body logging.
+Complete the unauthenticated first-run `/setup` flow on a trusted network before public exposure.

@@ -95,6 +95,19 @@ func TestLoadValidatesPublicURLAndLogLevel(t *testing.T) {
 	}
 }
 
+func TestLoadDoesNotIncludeInvalidPublicURLInError(t *testing.T) {
+	const secretURL = "https://example.test/\n?api_key=startup-secret"
+	t.Setenv("APERTURE_PUBLIC_URL", secretURL)
+
+	_, err := Load(nil)
+	if err == nil {
+		t.Fatal("expected invalid public URL to fail")
+	}
+	if strings.Contains(err.Error(), "startup-secret") || strings.Contains(err.Error(), secretURL) {
+		t.Fatalf("configuration error exposed URL contents: %q", err)
+	}
+}
+
 func TestLoadRejectsUnsafePublicURLParts(t *testing.T) {
 	t.Setenv("APERTURE_ENCRYPTION_KEY", testSecret)
 	t.Setenv("APERTURE_SESSION_SECRET", testSecret)

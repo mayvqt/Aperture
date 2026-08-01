@@ -1,15 +1,12 @@
 # Setup
 
-1. Start Aperture:
+```bash
+docker compose up --build
+```
 
-   ```bash
-   docker compose up --build
-   ```
+Open `http://localhost:8099` from a trusted network. Choose Jellyfin or Emby, enter the public URL, media-server URL,
+and API key, then sign in as a media-server administrator. Create or import a non-admin template before creating an
+invite.
 
-2. Open `http://localhost:8099`.
-3. Choose Jellyfin or Emby, then enter the Aperture URL, media-server URL, and API key.
-4. Sign in with a media-server administrator account.
-5. Import or create a non-administrator template, then create an invite.
-
-Standalone installs can run `aperture serve` and use the same browser setup. Secrets are generated automatically and
-stored under the config directory.
+Standalone installs use `aperture serve`. Persist and back up the config directory. Do not expose Aperture publicly
+until the unauthenticated first-run setup is complete.

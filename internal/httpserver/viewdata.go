@@ -3,12 +3,12 @@ package httpserver
 import "github.com/mayvqt/aperture/internal/db"
 
 type viewData struct {
-	Session          *db.Session
+	Admin            bool
+	Username         string
 	CSRF             string
 	Error            string
 	Message          string
 	Title            string
-	Settings         db.Settings
 	ServerName       string
 	Provider         string
 	ServerURL        string
@@ -23,7 +23,6 @@ type viewData struct {
 	InviteRows       []inviteRow
 	Invite           db.Invite
 	Registrations    []db.Registration
-	NewURL           string
 	PublicURL        string
 	Token            string
 	FormUsername     string
