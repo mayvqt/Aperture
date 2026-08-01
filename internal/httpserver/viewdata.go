@@ -2,23 +2,13 @@ package httpserver
 
 import "github.com/mayvqt/aperture/internal/db"
 
-type sessionView struct {
-	Username string
-}
-
-type settingsView struct {
-	Provider  string
-	PublicURL string
-	ServerURL string
-}
-
 type viewData struct {
-	Session          *sessionView
+	Admin            bool
+	Username         string
 	CSRF             string
 	Error            string
 	Message          string
 	Title            string
-	Settings         settingsView
 	ServerName       string
 	Provider         string
 	ServerURL        string

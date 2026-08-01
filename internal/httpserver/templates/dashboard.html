@@ -1,7 +1,7 @@
 {{define "admin"}}{{template "base-start" .}}
 <div class="page-head">
     <div>
-        <p class="eyebrow">Signed in as {{.Session.Username}}</p>
+        <p class="eyebrow">Signed in as {{.Username}}</p>
         <h1>Dashboard</h1>
         <p>See active invites, recent signups, and expiring accounts.</p>
     </div>
@@ -124,19 +124,19 @@
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Media server{{if .ProviderManaged}}<span class="hint">Managed by APERTURE_MEDIA_PROVIDER.</span>{{end}}<select
                     name="provider" {{if .ProviderManaged}}disabled{{end}}>
-                <option value="jellyfin" {{if eq .Settings.Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
-                <option value="emby" {{if eq .Settings.Provider "emby"}}selected{{end}}>Emby</option>
+                <option value="jellyfin" {{if eq .Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
+                <option value="emby" {{if eq .Provider "emby"}}selected{{end}}>Emby</option>
             </select>
                 {{if not .ProviderManaged}}<span class="hint">Changing the provider or server signs you out. Existing account history still refers to the previous server.</span>{{end}}
             </label>
             <label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span
                     class="hint">The address used in invite links.</span>{{end}}<input
-                    name="public_url" required value="{{.Settings.PublicURL}}"
+                    name="public_url" required value="{{.PublicURL}}"
                     {{if .PublicURLManaged}}disabled{{end}}>
             </label>
             <label>Server URL{{if .ServerURLManaged}}<span
                     class="hint">Managed by APERTURE_SERVER_URL.</span>{{end}}<input
-                    name="server_url" required value="{{.Settings.ServerURL}}"
+                    name="server_url" required value="{{.ServerURL}}"
                     {{if .ServerURLManaged}}disabled{{end}}>
             </label>
             <label>API key<span class="hint">{{if .APIKeyManaged}}Managed by APERTURE_API_KEY.{{else}}Leave blank to keep the saved key.{{end}}</span>

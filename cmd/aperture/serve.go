@@ -23,7 +23,6 @@ func serve(args []string) error {
 	if err != nil {
 		return err
 	}
-	setupLogger(cfg.LogLevel, cfg.APIKey, cfg.EncryptionKey, cfg.SessionSecret, cfg.InviteSecret)
 	if err := config.EnsureEncryptionKey(&cfg); err != nil {
 		return err
 	}

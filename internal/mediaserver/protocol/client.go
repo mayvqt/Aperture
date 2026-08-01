@@ -152,13 +152,12 @@ func (c *Client) DoJSONForDevice(ctx context.Context, baseURL, method, requestPa
 		return err
 	}
 	var reader io.Reader
-	var requestData []byte
 	if body != nil {
-		requestData, err = json.Marshal(body)
+		data, err := json.Marshal(body)
 		if err != nil {
 			return err
 		}
-		reader = bytes.NewReader(requestData)
+		reader = bytes.NewReader(data)
 	}
 	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
 	if err != nil {
