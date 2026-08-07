@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -104,18 +103,16 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 		s.error(w, err)
 		return
 	}
-	if err := s.store.Audit(r.Context(), session.UserID, "invite.create", "invite", strconv.FormatInt(inviteID, 10), clientIP(r, s.trustedProxies), requestUserAgent(r), "{}"); err != nil {
-		slog.Warn("could not record invite creation audit event", "error", safeError(err))
-	}
+	s.audit(r, session, "invite.create", "invite", strconv.FormatInt(inviteID, 10), map[string]any{"label": label, "max_uses": maxUses})
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
-func (s *Server) invitesDisable(w http.ResponseWriter, r *http.Request, _ db.Session) {
-	s.setInviteState(w, r, false)
+func (s *Server) invitesDisable(w http.ResponseWriter, r *http.Request, session db.Session) {
+	s.setInviteState(w, r, session, false)
 }
-func (s *Server) invitesEnable(w http.ResponseWriter, r *http.Request, _ db.Session) {
-	s.setInviteState(w, r, true)
+func (s *Server) invitesEnable(w http.ResponseWriter, r *http.Request, session db.Session) {
+	s.setInviteState(w, r, session, true)
 }
-func (s *Server) setInviteState(w http.ResponseWriter, r *http.Request, enabled bool) {
+func (s *Server) setInviteState(w http.ResponseWriter, r *http.Request, session db.Session, enabled bool) {
 	id, err := idFromPath(r, "id")
 	if err != nil {
 		s.message(w, "Invalid invite", "That invite does not exist.", http.StatusBadRequest)
@@ -125,9 +122,14 @@ func (s *Server) setInviteState(w http.ResponseWriter, r *http.Request, enabled 
 		s.inviteError(w, err)
 		return
 	}
+	action := "invite.disable"
+	if enabled {
+		action = "invite.enable"
+	}
+	s.audit(r, session, action, "invite", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
-func (s *Server) invitesDelete(w http.ResponseWriter, r *http.Request, _ db.Session) {
+func (s *Server) invitesDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
 	if err != nil {
 		s.message(w, "Invalid invite", "That invite does not exist.", http.StatusBadRequest)
@@ -137,6 +139,7 @@ func (s *Server) invitesDelete(w http.ResponseWriter, r *http.Request, _ db.Sess
 		s.inviteError(w, err)
 		return
 	}
+	s.audit(r, session, "invite.delete", "invite", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
 }
 

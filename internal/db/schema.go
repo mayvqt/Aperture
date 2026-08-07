@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const schemaRevision = 1
+const schemaRevision = 3
 
 const schema = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS registrations (
     user_disabled_at DATETIME,
     disable_attempts INTEGER NOT NULL DEFAULT 0,
     next_disable_attempt_at DATETIME,
+	 template_attempts INTEGER NOT NULL DEFAULT 0,
+	 next_template_attempt_at DATETIME,
     ip_address TEXT,
     user_agent TEXT,
     created_at DATETIME NOT NULL,
@@ -92,12 +94,25 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at DATETIME NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS webhooks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    url_encrypted TEXT NOT NULL,
+	 kind TEXT NOT NULL DEFAULT 'discord',
+    events TEXT NOT NULL,
+	 role_ids TEXT NOT NULL DEFAULT '',
+    enabled INTEGER NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_invites_status ON invites(enabled, deleted_at, expires_at, uses, max_uses);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_one_default ON templates(is_default) WHERE is_default = 1;
 CREATE INDEX IF NOT EXISTS idx_registrations_invite_id ON registrations(invite_id);
 CREATE INDEX IF NOT EXISTS idx_registrations_created_at ON registrations(created_at);
 CREATE INDEX IF NOT EXISTS idx_registrations_due_disable ON registrations(next_disable_attempt_at) WHERE external_user_id IS NOT NULL AND user_disabled_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_registrations_reconcile ON registrations(status, updated_at);
+CREATE INDEX IF NOT EXISTS idx_registrations_template_retry ON registrations(next_template_attempt_at) WHERE external_user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 `
@@ -129,6 +144,22 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		return fmt.Errorf("begin schema initialization: %w", err)
 	}
 	defer tx.Rollback()
+	if revision == 1 {
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE registrations ADD COLUMN template_attempts INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("add template attempts: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE registrations ADD COLUMN next_template_attempt_at DATETIME`); err != nil {
+			return fmt.Errorf("add template retry time: %w", err)
+		}
+	}
+	if revision == 2 {
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN kind TEXT NOT NULL DEFAULT 'discord'`); err != nil {
+			return fmt.Errorf("add webhook kind: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN role_ids TEXT NOT NULL DEFAULT ''`); err != nil {
+			return fmt.Errorf("add webhook role IDs: %w", err)
+		}
+	}
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("create schema: %w", err)
 	}
@@ -139,7 +170,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 	`); err != nil {
 		return fmt.Errorf("seed default template: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 1`); err != nil {
+	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 3`); err != nil {
 		return fmt.Errorf("record schema revision: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

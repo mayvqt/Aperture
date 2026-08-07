@@ -142,6 +142,7 @@ func (s *Server) settingsPost(w http.ResponseWriter, r *http.Request, session db
 		cookieSecure = s.cfg.CookieSecure
 	}
 	s.setRuntime(string(provider), publicURL, cookieSecure)
+	s.audit(r, session, "settings.update", "settings", "application", map[string]any{"provider": string(provider), "public_url": publicURL, "server_url": serverURL, "api_key_changed": apiKeyUpdate != nil})
 	if current.Provider != string(provider) || current.ServerURL != serverURL {
 		s.clearSession(w, r, session.ID)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

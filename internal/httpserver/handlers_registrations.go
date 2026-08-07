@@ -55,9 +55,8 @@ func (s *Server) registrationsRetryTemplate(w http.ResponseWriter, r *http.Reque
 		s.registrationRecoveryError(w, err)
 		return
 	}
-	if err := s.store.Audit(r.Context(), session.UserID, "registration.retry_template", "registration", strconv.FormatInt(id, 10), clientIP(r, s.trustedProxies), requestUserAgent(r), "{}"); err != nil {
-		slog.Warn("could not record template retry audit event", "registration_id", id, "error", safeError(err))
-	}
+	s.notify(webhookNotice{Event: "template.recovered", Title: "Access template recovered", Color: 0x2ecc71, Fields: map[string]string{"Username": recovery.Registration.Username, "Registration": strconv.FormatInt(id, 10), "Template": recovery.Template.Name}})
+	s.audit(r, session, "registration.retry_template", "registration", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/registrations", http.StatusSeeOther)
 }
 

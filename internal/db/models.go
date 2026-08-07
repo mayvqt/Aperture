@@ -100,16 +100,42 @@ func CanRetryRegistrationTemplate(status string) bool {
 }
 
 type Registration struct {
-	ID                   int64
-	InviteID             int64
-	ExternalUserID       sql.NullString
-	Username             string
-	Status               string
-	ErrorMessage         sql.NullString
-	UserDisableAt        sql.NullTime
-	UserDisabledAt       sql.NullTime
-	DisableAttempts      int
-	NextDisableAttemptAt sql.NullTime
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                    int64
+	InviteID              int64
+	ExternalUserID        sql.NullString
+	Username              string
+	Status                string
+	ErrorMessage          sql.NullString
+	UserDisableAt         sql.NullTime
+	UserDisabledAt        sql.NullTime
+	DisableAttempts       int
+	NextDisableAttemptAt  sql.NullTime
+	TemplateAttempts      int
+	NextTemplateAttemptAt sql.NullTime
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+type AuditEvent struct {
+	ID           int64
+	ActorUserID  string
+	Action       string
+	TargetType   string
+	TargetID     string
+	IPAddress    string
+	UserAgent    string
+	MetadataJSON string
+	CreatedAt    time.Time
+}
+
+type Webhook struct {
+	ID        int64
+	Name      string
+	URL       string
+	Kind      string
+	Events    string
+	RoleIDs   string
+	Enabled   bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

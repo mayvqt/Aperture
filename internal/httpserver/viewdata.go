@@ -28,7 +28,12 @@ type viewData struct {
 	FormUsername     string
 	Stats            dashboardStats
 	HealthChecks     []healthCheck
+	Webhooks         []db.Webhook
+	AuditEvents      []db.AuditEvent
+	WebhookEvents    []webhookEventOption
 }
+
+type webhookEventOption struct{ Value, Label string }
 
 type dashboardStats struct {
 	ActiveInvites         int

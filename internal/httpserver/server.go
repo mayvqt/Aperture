@@ -87,6 +87,7 @@ func runMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, m
 
 func (s *Server) runMaintenance(ctx context.Context) {
 	s.reconcileAndLogStaleRegistrations(ctx)
+	s.processDueTemplateRetries(ctx)
 	s.processAndLogDueUserDisables(ctx)
 }
 

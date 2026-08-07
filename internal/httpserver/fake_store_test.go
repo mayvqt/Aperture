@@ -39,6 +39,9 @@ type fakeStore struct {
 	setupSettingsErr   error
 	deletedSessionID   string
 	createdDeviceID    string
+	webhooks           []db.Webhook
+	auditEvents        []db.AuditEvent
+	dueTemplateRetries []db.RegistrationRecovery
 }
 
 type settingWrite struct {
@@ -273,6 +276,27 @@ func (f *fakeStore) DashboardCounts(context.Context) (db.DashboardCounts, error)
 }
 func (f *fakeStore) LatestInviteActivity(context.Context) (map[int64]db.InviteActivity, error) {
 	return f.inviteActivity, nil
+}
+func (f *fakeStore) ListAuditEvents(context.Context, int) ([]db.AuditEvent, error) {
+	return f.auditEvents, nil
+}
+func (f *fakeStore) ListWebhooks(context.Context) ([]db.Webhook, error) { return f.webhooks, nil }
+func (f *fakeStore) CreateWebhook(_ context.Context, hook db.Webhook) (int64, error) {
+	hook.ID = 1
+	f.webhooks = append(f.webhooks, hook)
+	return 1, nil
+}
+func (f *fakeStore) DeleteWebhook(_ context.Context, id int64) error {
+	for i, v := range f.webhooks {
+		if v.ID == id {
+			f.webhooks = append(f.webhooks[:i], f.webhooks[i+1:]...)
+			return nil
+		}
+	}
+	return db.ErrNotFound
+}
+func (f *fakeStore) DueTemplateRecoveries(context.Context, int) ([]db.RegistrationRecovery, error) {
+	return f.dueTemplateRetries, nil
 }
 
 var _ Store = (*fakeStore)(nil)

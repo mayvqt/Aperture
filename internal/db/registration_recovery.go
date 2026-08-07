@@ -116,7 +116,7 @@ func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64)
 	err = tx.QueryRowContext(ctx, `
 		SELECT r.id, r.invite_id, r.external_user_id, r.username, r.status, r.error_message,
 		       r.user_disable_at, r.user_disabled_at,
-		       r.disable_attempts, r.next_disable_attempt_at, r.created_at, r.updated_at,
+		       r.disable_attempts, r.next_disable_attempt_at, r.template_attempts, r.next_template_attempt_at, r.created_at, r.updated_at,
 		       COALESCE(r.template_name, ''),
 		       COALESCE(r.template_policy_json, ''),
 		       i.user_expiry_days
@@ -155,7 +155,10 @@ func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64)
 func (s *Store) RecordTemplateRetryFailure(ctx context.Context, registrationID int64, message string) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET status = ?, error_message = NULLIF(?, ''), updated_at = CURRENT_TIMESTAMP
+		SET status = ?, error_message = NULLIF(?, ''),
+		    template_attempts = template_attempts + 1,
+		    next_template_attempt_at = datetime(CURRENT_TIMESTAMP, '+' || CASE WHEN template_attempts >= 5 THEN 360 ELSE (1 << template_attempts) END || ' minutes'),
+		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND external_user_id IS NOT NULL
 		  AND status = ?
@@ -169,7 +172,7 @@ func (s *Store) RecordTemplateRetryFailure(ctx context.Context, registrationID i
 func (s *Store) CompleteTemplateRecovery(ctx context.Context, registrationID int64, disableAt sql.NullTime) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET status = ?, error_message = NULL,
+		SET status = ?, error_message = NULL, next_template_attempt_at = NULL,
 		    user_disable_at = ?, next_disable_attempt_at = ?,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?

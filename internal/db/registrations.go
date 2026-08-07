@@ -5,7 +5,7 @@ import (
 	"database/sql"
 )
 
-const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, created_at, updated_at`
+const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at`
 
 func (s *Store) FailUserCreation(ctx context.Context, registrationID int64, message string) error {
 	result, err := s.db.ExecContext(ctx, `
@@ -215,6 +215,8 @@ func registrationScanDestinations(reg *Registration) []any {
 		&reg.UserDisabledAt,
 		&reg.DisableAttempts,
 		&reg.NextDisableAttemptAt,
+		&reg.TemplateAttempts,
+		&reg.NextTemplateAttemptAt,
 		&reg.CreatedAt,
 		&reg.UpdatedAt,
 	}

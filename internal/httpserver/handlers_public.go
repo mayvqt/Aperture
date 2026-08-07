@@ -100,6 +100,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			slog.Warn("media-server user creation was partial", "registration_id", regID, "error", safeError(err))
+			s.notify(webhookNotice{Event: "registration.failed", Title: "Registration needs review", Description: "The account was created but setup was incomplete.", Color: 0xe67e22, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Error": safeError(err)}})
 			s.message(w, "Account needs review", "The account was created but disabled because setup was incomplete. Ask the server admin to review it.", http.StatusAccepted)
 			return
 		}
@@ -107,6 +108,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 			slog.Error("could not record uncertain media-server user creation", "registration_id", regID, "error", safeError(recordErr))
 		}
 		slog.Warn("media-server user creation failed", "error", safeError(err))
+		s.notify(webhookNotice{Event: "registration.failed", Title: "Registration failed", Color: 0xe74c3c, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Error": safeError(err)}})
 		s.message(w, "Registration failed", "The account could not be created. Ask the server admin to check this invite.", http.StatusInternalServerError)
 		return
 	}
@@ -119,6 +121,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 			slog.Error("could not record partial media-server registration", "registration_id", regID, "error", safeError(recordErr))
 		}
 		slog.Warn("media-server template application failed", "error", safeError(err))
+		s.notify(webhookNotice{Event: "template.failed", Title: "Template application failed", Description: "Aperture will retry automatically.", Color: 0xe67e22, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Template": template.Name, "Error": safeError(err)}})
 		s.message(w, "Account needs review", "The account was created, but an admin needs to finish applying access.", http.StatusAccepted)
 		return
 	}
@@ -129,6 +132,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.Audit(r.Context(), "", "registration.complete", "invite", strconv.FormatInt(invite.ID, 10), remoteIP, requestUserAgent(r), "{}"); err != nil {
 		slog.Warn("could not record registration audit event", "registration_id", regID, "error", safeError(err))
 	}
+	s.notify(webhookNotice{Event: "registration.complete", Title: "Registration completed", Color: 0x2ecc71, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Invite": invite.Label, "Template": template.Name, "Account ID": user.ID}})
 	http.Redirect(w, r, "/guide", http.StatusSeeOther)
 }
 func (s *Server) success(w http.ResponseWriter, r *http.Request) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -127,6 +128,7 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 				slog.Error("could not record media-server user disable failure", "registration_id", reg.ID, "error", safeError(recordErr))
 			}
 			slog.Warn("media-server user disable failed", "registration_id", reg.ID, "error", safeError(err))
+			s.notify(webhookNotice{Event: "user.disable_failed", Title: "Expired user disable failed", Description: "Aperture will retry automatically.", Color: 0xe67e22, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Error": safeError(err)}})
 			continue
 		}
 		if err := s.store.MarkUserDisabled(ctx, reg.ID); err != nil {
@@ -134,6 +136,32 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 			continue
 		}
 		disabled++
+		s.notify(webhookNotice{Event: "user.disabled", Title: "Expired user disabled", Color: 0x2ecc71, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10)}})
 	}
 	return disabled
+}
+
+func (s *Server) processDueTemplateRetries(ctx context.Context) {
+	settings, err := s.settings(ctx)
+	if err != nil || settings.ServerURL == "" || settings.APIKey == "" {
+		return
+	}
+	recoveries, err := s.store.DueTemplateRecoveries(ctx, 10)
+	if err != nil {
+		slog.Warn("could not claim template retries", "error", safeError(err))
+		return
+	}
+	for _, recovery := range recoveries {
+		reg := recovery.Registration
+		if err := s.media.ApplyTemplate(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String, recovery.Template); err != nil {
+			_ = s.store.RecordTemplateRetryFailure(ctx, reg.ID, safeError(err))
+			s.notify(webhookNotice{Event: "template.failed", Title: "Template retry failed", Description: "Aperture will retry with bounded backoff.", Color: 0xe67e22, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Attempt": strconv.Itoa(reg.TemplateAttempts + 1), "Error": safeError(err)}})
+			continue
+		}
+		if err := s.store.CompleteTemplateRecovery(ctx, reg.ID, disableAtFrom(reg.CreatedAt, recovery.UserExpiryDays)); err != nil {
+			slog.Warn("could not complete automatic template recovery", "registration_id", reg.ID, "error", safeError(err))
+			continue
+		}
+		s.notify(webhookNotice{Event: "template.recovered", Title: "Access template recovered", Color: 0x2ecc71, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Template": recovery.Template.Name}})
+	}
 }

@@ -14,3 +14,8 @@ the directly connected proxy CIDRs.
 Docker state lives under `/config`; standalone state defaults to `./data`. Aperture generates the encryption, session,
 and invite secrets when omitted. Back up the entire state directory. If a schema is unsupported, preserve the directory
 and use a compatible Aperture version; never delete the database as a normal upgrade step.
+
+## Webhooks
+
+Admins can configure Discord or generic JSON webhooks, events, and optional Discord role IDs in the web UI. URLs are
+encrypted. Failed template application is retried automatically up to six times.

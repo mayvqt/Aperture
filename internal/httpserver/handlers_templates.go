@@ -21,7 +21,7 @@ func (s *Server) templatesList(w http.ResponseWriter, r *http.Request, session d
 	data.Templates = templates
 	render(w, "templates", data)
 }
-func (s *Server) templatesCreate(w http.ResponseWriter, r *http.Request, _ db.Session) {
+func (s *Server) templatesCreate(w http.ResponseWriter, r *http.Request, session db.Session) {
 	if err := r.ParseForm(); err != nil {
 		s.message(w, "Invalid request", "The template form could not be read.", http.StatusBadRequest)
 		return
@@ -35,6 +35,7 @@ func (s *Server) templatesCreate(w http.ResponseWriter, r *http.Request, _ db.Se
 		s.error(w, err)
 		return
 	}
+	s.audit(r, session, "template.create", "template", "", map[string]any{"name": template.Name})
 	http.Redirect(w, r, "/admin/templates", http.StatusSeeOther)
 }
 func (s *Server) templatesShow(w http.ResponseWriter, r *http.Request, session db.Session) {
@@ -52,7 +53,7 @@ func (s *Server) templatesShow(w http.ResponseWriter, r *http.Request, session d
 	data.Template = template
 	render(w, "template-detail", data)
 }
-func (s *Server) templatesUpdate(w http.ResponseWriter, r *http.Request, _ db.Session) {
+func (s *Server) templatesUpdate(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
 	if err != nil {
 		s.message(w, "Invalid template", "That template does not exist.", http.StatusBadRequest)
@@ -71,10 +72,11 @@ func (s *Server) templatesUpdate(w http.ResponseWriter, r *http.Request, _ db.Se
 		s.templateError(w, err)
 		return
 	}
+	s.audit(r, session, "template.update", "template", strconv.FormatInt(id, 10), map[string]any{"name": template.Name})
 	http.Redirect(w, r, "/admin/templates/"+strconv.FormatInt(id, 10), http.StatusSeeOther)
 }
 
-func (s *Server) templatesDefault(w http.ResponseWriter, r *http.Request, _ db.Session) {
+func (s *Server) templatesDefault(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
 	if err != nil {
 		s.message(w, "Invalid template", "That template does not exist.", http.StatusBadRequest)
@@ -84,10 +86,11 @@ func (s *Server) templatesDefault(w http.ResponseWriter, r *http.Request, _ db.S
 		s.templateError(w, err)
 		return
 	}
+	s.audit(r, session, "template.default", "template", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/templates", http.StatusSeeOther)
 }
 
-func (s *Server) templatesDelete(w http.ResponseWriter, r *http.Request, _ db.Session) {
+func (s *Server) templatesDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
 	if err != nil {
 		s.message(w, "Invalid template", "That template does not exist.", http.StatusBadRequest)
@@ -97,6 +100,7 @@ func (s *Server) templatesDelete(w http.ResponseWriter, r *http.Request, _ db.Se
 		s.templateError(w, err)
 		return
 	}
+	s.audit(r, session, "template.delete", "template", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/templates", http.StatusSeeOther)
 }
 
@@ -149,6 +153,7 @@ func (s *Server) templatesImport(w http.ResponseWriter, r *http.Request, session
 		s.error(w, err)
 		return
 	}
+	s.audit(r, session, "template.import", "template", "", map[string]any{"name": template.Name, "source_user": userRef})
 	http.Redirect(w, r, "/admin/templates", http.StatusSeeOther)
 }
 

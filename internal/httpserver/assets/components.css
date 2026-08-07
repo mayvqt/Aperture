@@ -419,6 +419,27 @@ pre {
     min-width: 840px;
 }
 
+.webhook-card {
+    display: grid;
+    gap: 8px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.webhook-card:last-child {
+    border-bottom: 0;
+}
+
+.webhook-card p {
+    margin: 0;
+}
+
+.webhook-events {
+    overflow-wrap: anywhere;
+    color: var(--muted);
+    font-size: 13px;
+}
+
 .table-wrap th:first-child, .table-wrap td:first-child {
     padding-left: 14px;
 }
