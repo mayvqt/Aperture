@@ -246,7 +246,7 @@ func (s *Server) webhooksCreate(w http.ResponseWriter, r *http.Request, session 
 		return
 	}
 	s.audit(r, session, "webhook.create", "webhook", strconv.FormatInt(id, 10), map[string]any{"name": name, "kind": kind, "events": selected})
-	http.Redirect(w, r, "/admin/webhooks", 303)
+	http.Redirect(w, r, "/admin/webhooks", http.StatusSeeOther)
 }
 func (s *Server) webhooksDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
@@ -259,7 +259,7 @@ func (s *Server) webhooksDelete(w http.ResponseWriter, r *http.Request, session 
 		return
 	}
 	s.audit(r, session, "webhook.delete", "webhook", strconv.FormatInt(id, 10), nil)
-	http.Redirect(w, r, "/admin/webhooks", 303)
+	http.Redirect(w, r, "/admin/webhooks", http.StatusSeeOther)
 }
 func (s *Server) webhooksTest(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id, err := idFromPath(r, "id")
