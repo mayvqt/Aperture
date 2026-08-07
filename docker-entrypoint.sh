@@ -1,8 +1,23 @@
 #!/bin/sh
 set -eu
+umask 077
 
 PUID="${PUID:-99}"
 PGID="${PGID:-100}"
+
+for ID_VALUE in "$PUID" "$PGID"; do
+  case "$ID_VALUE" in
+    ''|*[!0-9]*)
+      echo "PUID and PGID must be numeric" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [ "$PUID" = "0" ] || [ "$PGID" = "0" ]; then
+  echo "PUID and PGID must be greater than zero" >&2
+  exit 1
+fi
 
 if [ "$(id -u)" = "0" ]; then
   TARGET_GROUP="aperture"

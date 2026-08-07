@@ -73,9 +73,9 @@ jobs:
           title="${INPUT_TITLE}"
           if [ -z "$title" ]; then
             if [ "$version" = "latest" ]; then
-              title="Aperture update"
+              title="Invite Dashboard Update"
             else
-              title="Aperture update ${version}"
+              title="Invite Dashboard Update ${version}"
             fi
           fi
 
@@ -153,7 +153,7 @@ jobs:
           node <<'NODE'
           const webhook = process.env.DISCORD_WEBHOOK_URL;
           const version = process.env.ANNOUNCE_VERSION || "latest";
-          const title = process.env.ANNOUNCE_TITLE || (version === "latest" ? "Aperture update" : `Aperture update ${version}`);
+          const title = process.env.ANNOUNCE_TITLE || (version === "latest" ? "Invite Dashboard Update" : `Invite Dashboard Update ${version}`);
           const notes = (process.env.ANNOUNCE_SUMMARY || "").trim();
           const changes = (process.env.ANNOUNCE_CHANGES || "")
             .split(/\r?\n/)
@@ -167,7 +167,7 @@ jobs:
           const noteText = notes ? `${notes}\n\n${changeText}` : changeText;
 
           const payload = {
-            username: "Aperture Updates",
+            username: "Aperture",
             allowed_mentions: { parse: [] },
             embeds: [
               {
