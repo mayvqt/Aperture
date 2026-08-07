@@ -29,6 +29,23 @@ legend {
     font-weight: 700;
 }
 
+label.check {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+label.check input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    padding: 0;
+    flex: 0 0 auto;
+    accent-color: var(--accent);
+}
+
 input, textarea, select {
     width: 100%;
     border: 1px solid var(--line);

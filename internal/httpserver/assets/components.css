@@ -421,6 +421,7 @@ pre {
 
 .webhook-card {
     display: grid;
+	min-width: 0;
     gap: 8px;
     padding: 14px 0;
     border-bottom: 1px solid var(--line);
@@ -435,7 +436,9 @@ pre {
 }
 
 .webhook-events {
+	max-width: 100%;
     overflow-wrap: anywhere;
+	word-break: break-word;
     color: var(--muted);
     font-size: 13px;
 }
