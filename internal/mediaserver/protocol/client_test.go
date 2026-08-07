@@ -12,6 +12,16 @@ import (
 	"github.com/mayvqt/aperture/internal/mediaserver"
 )
 
+func TestDefaultClientDoesNotFollowRedirects(t *testing.T) {
+	client := New(testAuthorization, identityURL)
+	if client.http.CheckRedirect == nil {
+		t.Fatal("default client has no redirect policy")
+	}
+	if err := client.http.CheckRedirect(&http.Request{}, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("CheckRedirect error = %v, want http.ErrUseLastResponse", err)
+	}
+}
+
 func TestPingReturnsTypedHTTPError(t *testing.T) {
 	client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		return response(http.StatusForbidden, ""), nil

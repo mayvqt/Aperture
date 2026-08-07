@@ -41,6 +41,9 @@ func New(auth Authorization, normalizeURL func(string) (string, error)) *Client 
 	return NewWithHTTPClient(auth, normalizeURL, &http.Client{
 		Transport: transport,
 		Timeout:   20 * time.Second,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	})
 }
 
