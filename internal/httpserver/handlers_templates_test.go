@@ -40,6 +40,20 @@ func TestTemplatesCreateStripsAdminPrivilege(t *testing.T) {
 	}
 }
 
+func TestTemplatesPageUsesStackedWorkflows(t *testing.T) {
+	store := newFakeStore()
+	handler := New(testConfig(), store, &fakeMediaServer{})
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/templates", nil))
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d; body %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), `class="stack template-workflows"`) || !strings.Contains(rr.Body.String(), "Existing templates") {
+		t.Fatalf("templates page is not using stacked workflow panels:\n%s", rr.Body.String())
+	}
+}
+
 func TestTemplateDetailShowsPreviewAndUpdatesTemplate(t *testing.T) {
 	store := newFakeStore()
 	store.template = db.Template{

@@ -7,7 +7,7 @@
     </div>
 </div>{{if .Error}}
 <div class="notice error">{{.Error}}</div>{{end}}
-<section class="split">
+<section class="stack template-workflows">
     <div class="panel">
         <h2>Create</h2>
         <form action="/admin/templates" method="post">
@@ -35,7 +35,8 @@
         </form>
     </div>
 </section>
-<h2>Existing</h2>
+<section class="panel section">
+<div class="page-head"><h2>Existing templates</h2></div>
 <div class="table-wrap">
     <table>
         <thead>
@@ -78,7 +79,7 @@
         {{end}}
         </tbody>
     </table>
-</div>{{template "base-end" .}}{{end}}
+</div></section>{{template "base-end" .}}{{end}}
 {{define "template-detail"}}{{template "base-start" .}}
 <div class="page-head">
     <div>
@@ -100,7 +101,7 @@
     </div>
 </div>{{if .Error}}
 <div class="notice error">{{.Error}}</div>{{end}}
-<section class="split">
+<section class="stack template-workflows">
     <div class="panel">
         <h2>Edit</h2>
         <form action="/admin/templates/{{.Template.ID}}" method="post">
