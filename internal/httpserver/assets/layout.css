@@ -38,6 +38,62 @@ nav a, nav button {
     cursor: pointer;
 }
 
+.nav-more {
+    position: relative;
+}
+
+.nav-more summary {
+    list-style: none;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-radius: 7px;
+    font-size: 14px;
+    line-height: 1;
+    padding: 8px 24px 8px 10px;
+    cursor: pointer;
+    position: relative;
+}
+
+.nav-more summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-more summary::after {
+    content: "";
+    position: absolute;
+    right: 9px;
+    top: 11px;
+    width: 5px;
+    height: 5px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.nav-more[open] summary, .nav-more summary:hover {
+    color: var(--ink);
+    background: rgba(255, 255, 255, .04);
+    border-color: var(--line-soft);
+}
+
+.nav-menu {
+    position: absolute;
+    top: calc(100% + 7px);
+    right: 0;
+    z-index: 10;
+    display: grid;
+    min-width: 160px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+}
+
+.nav-menu a {
+    font-weight: 550;
+}
+
 nav a:hover, nav button:hover {
     color: var(--ink);
     background: rgba(255, 255, 255, .04);
