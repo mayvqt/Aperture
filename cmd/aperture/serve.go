@@ -74,9 +74,10 @@ func serve(args []string) error {
 		httpserver.RunMaintenanceWorker(ctx, cfg, store, media)
 	}()
 
+	handler, waitForWebhooks := httpserver.NewWithShutdown(cfg, store, media)
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpserver.New(cfg, store, media),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -95,6 +96,11 @@ func serve(args []string) error {
 	err = srv.ListenAndServe()
 	stop()
 	<-workerDone
+	deliveryCtx, cancelDeliveries := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelDeliveries()
+	if waitErr := waitForWebhooks(deliveryCtx); waitErr != nil {
+		slog.Warn("webhook deliveries did not finish before shutdown", "error", waitErr)
+	}
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}

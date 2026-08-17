@@ -65,7 +65,9 @@ func (s *Server) notify(n webhookNotice) {
 			continue
 		}
 		hook := hook
+		s.webhookWG.Add(1)
 		go func() {
+			defer s.webhookWG.Done()
 			ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
 			defer cancel()
 			if err := sendWebhook(ctx, hook, n); err != nil {

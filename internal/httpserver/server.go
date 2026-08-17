@@ -31,9 +31,17 @@ type Server struct {
 	provider         string
 	runtimePublicURL string
 	cookieSecure     bool
+	webhookWG        sync.WaitGroup
 }
 
 func New(cfg config.Config, store Store, media MediaServer) http.Handler {
+	handler, _ := NewWithShutdown(cfg, store, media)
+	return handler
+}
+
+// NewWithShutdown returns the HTTP handler and a function that waits for
+// accepted webhook deliveries to finish during graceful shutdown.
+func NewWithShutdown(cfg config.Config, store Store, media MediaServer) (http.Handler, func(context.Context) error) {
 	s := &Server{
 		cfg:              cfg,
 		store:            store,
@@ -48,7 +56,21 @@ func New(cfg config.Config, store Store, media MediaServer) http.Handler {
 		cookieSecure:     cfg.CookieSecure,
 	}
 	s.routes()
-	return s.securityHeaders(s.mux)
+	return s.securityHeaders(s.mux), s.waitForWebhooks
+}
+
+func (s *Server) waitForWebhooks(ctx context.Context) error {
+	done := make(chan struct{})
+	go func() {
+		s.webhookWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *Server) setRuntime(provider, publicURL string, cookieSecure bool) {

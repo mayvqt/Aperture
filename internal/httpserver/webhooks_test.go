@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
 )
@@ -66,6 +67,31 @@ func TestValidateWebhookKindURL(t *testing.T) {
 		t.Fatal("accepted non-Discord URL")
 	}
 	if err := validateWebhookKindURL("generic", "https://example.com/hook"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWaitForWebhooksDrainsAcceptedDeliveries(t *testing.T) {
+	s := &Server{}
+	release := make(chan struct{})
+	s.webhookWG.Add(1)
+	go func() {
+		defer s.webhookWG.Done()
+		<-release
+	}()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- s.waitForWebhooks(ctx) }()
+
+	select {
+	case <-done:
+		t.Fatal("shutdown returned before delivery completed")
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(release)
+	if err := <-done; err != nil {
 		t.Fatal(err)
 	}
 }
