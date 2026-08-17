@@ -463,6 +463,17 @@ pre {
     text-overflow: ellipsis;
 }
 
+.cell-stack {
+    display: grid;
+    gap: 3px;
+    white-space: nowrap;
+}
+
+.cell-stack small {
+    color: var(--subtle);
+    font-size: 12px;
+}
+
 .invite-list {
     display: grid;
     gap: 12px;
