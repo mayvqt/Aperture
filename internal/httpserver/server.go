@@ -15,6 +15,8 @@ const (
 	maintenanceInterval       = time.Minute
 	staleRegistrationAge      = 15 * time.Minute
 	maintenanceReconcileLimit = 100
+	auditRetention            = 90 * 24 * time.Hour
+	auditPruneLimit           = 1000
 )
 
 type Server struct {
@@ -111,6 +113,18 @@ func (s *Server) runMaintenance(ctx context.Context) {
 	s.reconcileAndLogStaleRegistrations(ctx)
 	s.processDueTemplateRetries(ctx)
 	s.processAndLogDueUserDisables(ctx)
+	s.pruneAuditLog(ctx)
+}
+
+func (s *Server) pruneAuditLog(ctx context.Context) {
+	deleted, err := s.store.PruneAuditEvents(ctx, time.Now().Add(-auditRetention), auditPruneLimit)
+	if err != nil {
+		slog.Warn("could not prune audit log", "error", safeError(err))
+		return
+	}
+	if deleted > 0 {
+		slog.Info("pruned expired audit events", "deleted", deleted)
+	}
 }
 
 func (s *Server) reconcileAndLogStaleRegistrations(ctx context.Context) {

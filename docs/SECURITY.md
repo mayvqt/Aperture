@@ -11,3 +11,6 @@ forms and configured secrets.
 
 Treat `/config`, backups, `.env`, cookies, logs, and invite links as sensitive. Disable proxy request-body logging.
 Complete the unauthenticated first-run `/setup` flow on a trusted network before public exposure.
+
+Administrative audit events are retained for 90 days. Maintenance removes expired events in bounded batches to keep
+the application database from growing indefinitely.

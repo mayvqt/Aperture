@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 )
 
 func (s *Store) ListAuditEvents(ctx context.Context, limit int) ([]AuditEvent, error) {
@@ -21,6 +22,22 @@ func (s *Store) ListAuditEvents(ctx context.Context, limit int) ([]AuditEvent, e
 		out = append(out, v)
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) PruneAuditEvents(ctx context.Context, before time.Time, limit int) (int64, error) {
+	result, err := s.db.ExecContext(ctx, `
+		DELETE FROM audit_log
+		WHERE id IN (
+			SELECT id FROM audit_log
+			WHERE created_at < ?
+			ORDER BY id
+			LIMIT ?
+		)
+	`, before.UTC(), limit)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 func (s *Store) ListWebhooks(ctx context.Context) ([]Webhook, error) {

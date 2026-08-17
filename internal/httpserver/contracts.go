@@ -46,6 +46,7 @@ type Store interface {
 	DashboardCounts(context.Context) (db.DashboardCounts, error)
 	LatestInviteActivity(context.Context) (map[int64]db.InviteActivity, error)
 	ListAuditEvents(context.Context, int) ([]db.AuditEvent, error)
+	PruneAuditEvents(context.Context, time.Time, int) (int64, error)
 	ListWebhooks(context.Context) ([]db.Webhook, error)
 	CreateWebhook(context.Context, db.Webhook) (int64, error)
 	DeleteWebhook(context.Context, int64) error

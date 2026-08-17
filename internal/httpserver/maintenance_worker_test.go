@@ -27,4 +27,7 @@ func TestMaintenanceWorkerReconcilesAndProcessesExpiryImmediately(t *testing.T) 
 	if media.disabledUserID != "expired-user" {
 		t.Fatalf("disabled user = %q, want expired-user", media.disabledUserID)
 	}
+	if !store.prunedAuditEvents {
+		t.Fatal("maintenance worker did not prune expired audit events")
+	}
 }

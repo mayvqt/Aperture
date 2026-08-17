@@ -3,6 +3,7 @@ package db
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestWebhookRoundTripEncryptsURL(t *testing.T) {
@@ -24,6 +25,29 @@ func TestWebhookRoundTripEncryptsURL(t *testing.T) {
 	}
 	if len(hooks) != 1 || hooks[0].URL != "https://discord.example/api/webhooks/secret" || hooks[0].Kind != "discord" || hooks[0].RoleIDs != "12345678901234567" || !hooks[0].Enabled {
 		t.Fatalf("hooks = %#v", hooks)
+	}
+}
+
+func TestPruneAuditEventsIsBoundedAndKeepsRecentEvents(t *testing.T) {
+	ctx, store := testStore(t)
+	for _, createdAt := range []string{"2025-01-01 00:00:00", "2025-01-02 00:00:00", "2030-01-01 00:00:00"} {
+		if _, err := store.db.ExecContext(ctx, `INSERT INTO audit_log(action, metadata_json, created_at) VALUES('test', '{}', ?)`, createdAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	deleted, err := store.PruneAuditEvents(ctx, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 1 {
+		t.Fatalf("deleted = %d, want 1", deleted)
+	}
+	var remaining int
+	if err := store.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM audit_log`).Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != 2 {
+		t.Fatalf("remaining = %d, want 2", remaining)
 	}
 }
 

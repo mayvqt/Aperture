@@ -41,6 +41,7 @@ type fakeStore struct {
 	createdDeviceID    string
 	webhooks           []db.Webhook
 	auditEvents        []db.AuditEvent
+	prunedAuditEvents  bool
 	dueTemplateRetries []db.RegistrationRecovery
 }
 
@@ -279,6 +280,10 @@ func (f *fakeStore) LatestInviteActivity(context.Context) (map[int64]db.InviteAc
 }
 func (f *fakeStore) ListAuditEvents(context.Context, int) ([]db.AuditEvent, error) {
 	return f.auditEvents, nil
+}
+func (f *fakeStore) PruneAuditEvents(context.Context, time.Time, int) (int64, error) {
+	f.prunedAuditEvents = true
+	return 0, nil
 }
 func (f *fakeStore) ListWebhooks(context.Context) ([]db.Webhook, error) { return f.webhooks, nil }
 func (f *fakeStore) CreateWebhook(_ context.Context, hook db.Webhook) (int64, error) {
