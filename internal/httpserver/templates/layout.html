@@ -26,14 +26,9 @@
         <a href="/admin/templates">Templates</a>
         <a href="/admin/registrations">Registrations</a>
         <a href="/admin/users">Users</a>
-        <div class="nav-more">
-            <button aria-controls="admin-more-menu" aria-expanded="false" aria-haspopup="true" class="nav-more-button" type="button">More</button>
-            <div class="nav-menu" hidden id="admin-more-menu">
-                <a href="/admin/webhooks">Webhooks</a>
-                <a href="/admin/audit">Audit log</a>
-                <a href="/admin/settings">Settings</a>
-            </div>
-        </div>
+        <a href="/admin/webhooks">Webhooks</a>
+        <a href="/admin/audit">Audit log</a>
+        <a href="/admin/settings">Settings</a>
         <form action="/logout" class="logout-form" method="post">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <button>Log out</button>

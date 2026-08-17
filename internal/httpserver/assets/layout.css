@@ -38,65 +38,6 @@ nav a, nav button {
     cursor: pointer;
 }
 
-.nav-more {
-    position: relative;
-}
-
-.nav-more-button {
-    color: var(--muted);
-    border: 1px solid transparent;
-    padding: 8px 24px 8px 10px;
-    position: relative;
-    box-shadow: none;
-}
-
-.nav-more-button::after {
-    content: "";
-    position: absolute;
-    right: 9px;
-    top: 11px;
-    width: 5px;
-    height: 5px;
-    border-right: 1.5px solid currentColor;
-    border-bottom: 1.5px solid currentColor;
-    transform: rotate(45deg);
-}
-
-.nav-more-button[aria-expanded="true"], .nav-more-button:hover {
-    color: var(--ink);
-    background: rgba(255, 255, 255, .04);
-    border-color: var(--line-soft);
-}
-
-.nav-more-button[aria-expanded="true"]::after {
-    top: 14px;
-    transform: rotate(225deg);
-}
-
-.nav-menu {
-    position: absolute;
-    top: calc(100% + 7px);
-    right: 0;
-    z-index: 10;
-    display: grid;
-    min-width: 180px;
-    padding: 7px;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: #111923;
-    box-shadow: var(--shadow);
-}
-
-.nav-menu[hidden] {
-    display: none;
-}
-
-.nav-menu a {
-    font-weight: 550;
-    padding: 10px 11px;
-    border-radius: 6px;
-}
-
 nav a:hover, nav button:hover {
     color: var(--ink);
     background: rgba(255, 255, 255, .04);
