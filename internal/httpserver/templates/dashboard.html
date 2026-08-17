@@ -85,7 +85,8 @@
                     <th>User</th>
                     <th>Status</th>
                     <th>Access ends</th>
-                    <th>Retry</th>
+                    <th>Next retry</th>
+                    <th></th>
                 </tr>
                 </thead>
                 <tbody>{{range .Registrations}}
@@ -96,10 +97,14 @@
                     </td>
                     <td>{{nullDate .UserDisableAt}}</td>
                     <td>{{nullDateTime .NextDisableAttemptAt}}</td>
+                    <td><form action="/admin/registrations/{{.ID}}/delete" data-confirm="Remove this registration record? The media-server user must already be deleted." method="post">
+                        <input name="csrf" type="hidden" value="{{$.CSRF}}"><input name="return_to" type="hidden" value="/admin">
+                        <button class="danger small">Remove</button>
+                    </form></td>
                 </tr>
                 {{else}}
                 <tr>
-                    <td colspan="4">No registrations yet.</td>
+                    <td colspan="5">No registrations yet.</td>
                 </tr>
                 {{end}}
                 </tbody>
@@ -188,13 +193,16 @@
             <td><span class="cell-stack">Ends {{nullDate .UserDisableAt}}<small>Disabled {{nullDate .UserDisabledAt}}</small></span></td>
             <td><span class="cell-stack">{{.DisableAttempts}} attempts<small>Next {{nullDateTime .NextDisableAttemptAt}}</small></span></td>
 			<td><span class="cell-stack">{{.TemplateAttempts}} attempts<small>Next {{nullDateTime .NextTemplateAttemptAt}}</small></span></td>
-            <td>{{if canRetryTemplate .Status .ExternalUserID}}
+            <td><div class="row-actions">{{if canRetryTemplate .Status .ExternalUserID}}
                 <form action="/admin/registrations/{{.ID}}/retry-template" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="small">Retry access</button>
                 </form>
                 {{end}}
-            </td>
+                <form action="/admin/registrations/{{.ID}}/delete" data-confirm="Remove this registration record? The media-server user must already be deleted." method="post">
+                    <input name="csrf" type="hidden" value="{{$.CSRF}}">
+                    <button class="danger small">Remove</button>
+                </form></div></td>
             <td>{{.CreatedAt}}</td>
         </tr>
         {{else}}

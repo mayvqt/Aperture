@@ -94,3 +94,34 @@ func TestRegistrationTemplateRetryRecordsFailure(t *testing.T) {
 		t.Fatalf("failure/completed = %q/%t", store.recoveryFailure, store.recoveryCompleted)
 	}
 }
+
+func TestRegistrationDeleteRequiresMediaUserToBeAbsent(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		userExists bool
+		wantStatus int
+		wantDelete bool
+	}{
+		{name: "user already deleted", wantStatus: http.StatusSeeOther, wantDelete: true},
+		{name: "user still exists", userExists: true, wantStatus: http.StatusConflict},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			store := newFakeStore()
+			media := &fakeMediaServer{userExists: test.userExists}
+			handler := New(testConfig(), store, media)
+			form := url.Values{"csrf": {store.session.CSRFSecret}}
+			req := adminRequest(t, http.MethodPost, "/admin/registrations/1/delete", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body %s", rr.Code, test.wantStatus, rr.Body.String())
+			}
+			if got := store.deletedRegistrationID == 1; got != test.wantDelete {
+				t.Fatalf("deleted = %t, want %t", got, test.wantDelete)
+			}
+		})
+	}
+}

@@ -60,6 +60,49 @@ func (s *Server) registrationsRetryTemplate(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, "/admin/registrations", http.StatusSeeOther)
 }
 
+func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
+	id, err := idFromPath(r, "id")
+	if err != nil {
+		s.message(w, "Invalid registration", "That registration does not exist.", http.StatusBadRequest)
+		return
+	}
+	registration, err := s.store.Registration(r.Context(), id)
+	if err != nil {
+		s.registrationRecoveryError(w, err)
+		return
+	}
+	if registration.ExternalUserID.Valid && strings.TrimSpace(registration.ExternalUserID.String) != "" {
+		settings, err := s.settings(r.Context())
+		if err != nil {
+			s.error(w, err)
+			return
+		}
+		if strings.TrimSpace(settings.APIKey) == "" {
+			s.message(w, "API key required", "Aperture must verify that the media-server user has been deleted first.", http.StatusConflict)
+			return
+		}
+		exists, err := s.media.UserExists(r.Context(), settings.ServerURL, settings.APIKey, registration.ExternalUserID.String)
+		if err != nil {
+			s.message(w, "Could not verify user", "Aperture could not check the media server. Try again shortly.", http.StatusBadGateway)
+			return
+		}
+		if exists {
+			s.message(w, "User still exists", "Delete the user from the media server before removing this registration record.", http.StatusConflict)
+			return
+		}
+	}
+	if err := s.store.DeleteRegistration(r.Context(), id); err != nil {
+		s.registrationRecoveryError(w, err)
+		return
+	}
+	s.audit(r, session, "registration.delete", "registration", strconv.FormatInt(id, 10), map[string]any{"username": registration.Username})
+	destination := "/admin/registrations"
+	if r.FormValue("return_to") == "/admin" {
+		destination = "/admin"
+	}
+	http.Redirect(w, r, destination, http.StatusSeeOther)
+}
+
 func (s *Server) recordTemplateRetryFailure(r *http.Request, registrationID int64, err error) {
 	if recordErr := s.store.RecordTemplateRetryFailure(r.Context(), registrationID, safeError(err)); recordErr != nil {
 		slog.Error("could not record template retry failure", "registration_id", registrationID, "error", safeError(recordErr))

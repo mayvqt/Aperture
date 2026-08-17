@@ -9,40 +9,41 @@ import (
 )
 
 type fakeStore struct {
-	settings           db.Settings
-	session            db.Session
-	template           db.Template
-	invite             db.Invite
-	invites            []db.Invite
-	registrations      []db.Registration
-	inviteActivity     map[int64]db.InviteActivity
-	createdInvite      db.Invite
-	createdTemplate    db.Template
-	updatedTemplate    db.Template
-	defaultTemplateID  int64
-	deletedTemplateID  int64
-	completedDisableAt sql.NullTime
-	dueDisables        []db.Registration
-	markedDisabledID   int64
-	inviteErr          error
-	templateErr        error
-	reservedInviteUse  bool
-	beganUserCreation  bool
-	recordedUserID     string
-	completedStatus    string
-	recovery           db.RegistrationRecovery
-	recoveryFailure    string
-	recoveryCompleted  bool
-	reconciledStale    bool
-	reconciliation     db.ReconciliationResult
-	settingWrites      []settingWrite
-	setupSettingsErr   error
-	deletedSessionID   string
-	createdDeviceID    string
-	webhooks           []db.Webhook
-	auditEvents        []db.AuditEvent
-	prunedAuditEvents  bool
-	dueTemplateRetries []db.RegistrationRecovery
+	settings              db.Settings
+	session               db.Session
+	template              db.Template
+	invite                db.Invite
+	invites               []db.Invite
+	registrations         []db.Registration
+	deletedRegistrationID int64
+	inviteActivity        map[int64]db.InviteActivity
+	createdInvite         db.Invite
+	createdTemplate       db.Template
+	updatedTemplate       db.Template
+	defaultTemplateID     int64
+	deletedTemplateID     int64
+	completedDisableAt    sql.NullTime
+	dueDisables           []db.Registration
+	markedDisabledID      int64
+	inviteErr             error
+	templateErr           error
+	reservedInviteUse     bool
+	beganUserCreation     bool
+	recordedUserID        string
+	completedStatus       string
+	recovery              db.RegistrationRecovery
+	recoveryFailure       string
+	recoveryCompleted     bool
+	reconciledStale       bool
+	reconciliation        db.ReconciliationResult
+	settingWrites         []settingWrite
+	setupSettingsErr      error
+	deletedSessionID      string
+	createdDeviceID       string
+	webhooks              []db.Webhook
+	auditEvents           []db.AuditEvent
+	prunedAuditEvents     bool
+	dueTemplateRetries    []db.RegistrationRecovery
 }
 
 type settingWrite struct {
@@ -252,6 +253,18 @@ func (f *fakeStore) Audit(context.Context, string, string, string, string, strin
 }
 func (f *fakeStore) RecentRegistrations(context.Context, int) ([]db.Registration, error) {
 	return f.registrations, nil
+}
+func (f *fakeStore) Registration(_ context.Context, id int64) (db.Registration, error) {
+	for _, registration := range f.registrations {
+		if registration.ID == id {
+			return registration, nil
+		}
+	}
+	return db.Registration{}, db.ErrNotFound
+}
+func (f *fakeStore) DeleteRegistration(_ context.Context, id int64) error {
+	f.deletedRegistrationID = id
+	return nil
 }
 func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error) {
 	recovery := f.recovery

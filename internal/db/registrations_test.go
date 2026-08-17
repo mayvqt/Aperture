@@ -68,6 +68,31 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 	}
 }
 
+func TestDeleteRegistrationRemovesOnlyTheHistoryRecord(t *testing.T) {
+	ctx, store := testStore(t)
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "delete-history", TemplateID: 1, MaxUses: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteRegistration(ctx, registrationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Registration(ctx, registrationID); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("lookup after delete error = %v, want ErrNotFound", err)
+	}
+	invite, err := store.InviteByHash(ctx, "delete-history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invite.Uses != 1 {
+		t.Fatalf("invite uses = %d, want historical use preserved", invite.Uses)
+	}
+}
+
 func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 	ctx, store := testStore(t)
 	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-backoff", TemplateID: 1, MaxUses: 1})

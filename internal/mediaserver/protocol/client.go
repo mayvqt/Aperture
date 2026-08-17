@@ -116,6 +116,18 @@ func (c *Client) DisableUser(ctx context.Context, baseURL, apiKey, userID string
 	return c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/"+url.PathEscape(userID)+"/Policy", apiKey, policy, nil)
 }
 
+func (c *Client) UserExists(ctx context.Context, baseURL, apiKey, userID string) (bool, error) {
+	err := c.DoJSON(ctx, baseURL, http.MethodGet, "/Users/"+url.PathEscape(userID), apiKey, nil, &struct{}{})
+	if err == nil {
+		return true, nil
+	}
+	var httpErr *mediaserver.HTTPError
+	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
+		return false, nil
+	}
+	return false, err
+}
+
 func (c *Client) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID string, tmpl db.Template) error {
 	var policy map[string]any
 	if err := json.Unmarshal([]byte(tmpl.PolicyJSON), &policy); err != nil {

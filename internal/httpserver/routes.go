@@ -32,6 +32,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /admin/templates/import-from-user", s.adminPost(s.templatesImport))
 	s.mux.HandleFunc("GET /admin/registrations", s.admin(s.registrationsList))
 	s.mux.HandleFunc("POST /admin/registrations/{id}/retry-template", s.adminPost(s.registrationsRetryTemplate))
+	s.mux.HandleFunc("POST /admin/registrations/{id}/delete", s.adminPost(s.registrationsDelete))
 	s.mux.HandleFunc("GET /i/{token}", s.publicInvite)
 	s.mux.HandleFunc("POST /i/{token}/register", s.publicRegister)
 	s.mux.HandleFunc("GET /success", s.success)

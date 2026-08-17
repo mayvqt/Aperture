@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at`
@@ -142,6 +143,30 @@ func (s *Store) RecentRegistrations(ctx context.Context, limit int) ([]Registrat
 		regs = append(regs, reg)
 	}
 	return regs, rows.Err()
+}
+
+func (s *Store) Registration(ctx context.Context, id int64) (Registration, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE id = ?`, id)
+	registration, err := scanRegistration(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Registration{}, ErrNotFound
+	}
+	return registration, err
+}
+
+func (s *Store) DeleteRegistration(ctx context.Context, id int64) error {
+	result, err := s.db.ExecContext(ctx, `DELETE FROM registrations WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	changed, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if changed != 1 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) DashboardCounts(ctx context.Context) (DashboardCounts, error) {

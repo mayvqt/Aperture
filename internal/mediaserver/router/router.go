@@ -72,6 +72,9 @@ func (s *Server) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID stri
 func (s *Server) DisableUser(ctx context.Context, baseURL, apiKey, userID string) error {
 	return s.current().DisableUser(ctx, baseURL, apiKey, userID)
 }
+func (s *Server) UserExists(ctx context.Context, baseURL, apiKey, userID string) (bool, error) {
+	return s.current().UserExists(ctx, baseURL, apiKey, userID)
+}
 func (s *Server) ImportTemplate(ctx context.Context, baseURL, token, deviceID, userRef string) (mediaserver.TemplateData, error) {
 	return s.current().ImportTemplate(ctx, baseURL, token, deviceID, userRef)
 }

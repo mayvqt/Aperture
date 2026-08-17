@@ -34,6 +34,27 @@ func TestPingReturnsTypedHTTPError(t *testing.T) {
 	}
 }
 
+func TestUserExistsTreatsOnlyNotFoundAsAbsent(t *testing.T) {
+	for _, test := range []struct {
+		status  int
+		want    bool
+		wantErr bool
+	}{
+		{status: http.StatusOK, want: true},
+		{status: http.StatusNotFound},
+		{status: http.StatusUnauthorized, wantErr: true},
+	} {
+		client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			body := `{}`
+			return response(test.status, body), nil
+		})})
+		got, err := client.UserExists(t.Context(), "http://media.test", "key", "user-1")
+		if got != test.want || (err != nil) != test.wantErr {
+			t.Fatalf("status %d: exists/error = %t/%v", test.status, got, err)
+		}
+	}
+}
+
 func TestTransportErrorsDoNotExposeRequestSecretsOrPrivateURL(t *testing.T) {
 	const (
 		apiKey   = "transport-api-key"
