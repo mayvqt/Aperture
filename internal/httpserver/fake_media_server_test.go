@@ -31,6 +31,8 @@ type fakeMediaServer struct {
 	provider        mediaserver.Provider
 	userExists      bool
 	userExistsErr   error
+	users           []mediaserver.User
+	deletedUserID   string
 }
 
 func (f *fakeMediaServer) SetProvider(provider mediaserver.Provider) error {
@@ -80,6 +82,13 @@ func (f *fakeMediaServer) DisableUser(_ context.Context, _ string, _ string, use
 }
 func (f *fakeMediaServer) UserExists(context.Context, string, string, string) (bool, error) {
 	return f.userExists, f.userExistsErr
+}
+func (f *fakeMediaServer) ListUsers(context.Context, string, string) ([]mediaserver.User, error) {
+	return f.users, nil
+}
+func (f *fakeMediaServer) DeleteUser(_ context.Context, _, _, userID string) error {
+	f.deletedUserID = userID
+	return nil
 }
 func (f *fakeMediaServer) ImportTemplate(context.Context, string, string, string, string) (mediaserver.TemplateData, error) {
 	if f.importErr != nil {

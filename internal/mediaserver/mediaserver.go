@@ -27,6 +27,8 @@ type Server interface {
 	ApplyTemplate(context.Context, string, string, string, db.Template) error
 	DisableUser(context.Context, string, string, string) error
 	UserExists(context.Context, string, string, string) (bool, error)
+	ListUsers(context.Context, string, string) ([]User, error)
+	DeleteUser(context.Context, string, string, string) error
 	ImportTemplate(context.Context, string, string, string, string) (TemplateData, error)
 }
 

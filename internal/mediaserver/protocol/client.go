@@ -128,6 +128,18 @@ func (c *Client) UserExists(ctx context.Context, baseURL, apiKey, userID string)
 	return false, err
 }
 
+func (c *Client) ListUsers(ctx context.Context, baseURL, apiKey string) ([]mediaserver.User, error) {
+	var users []mediaserver.User
+	if err := c.DoJSON(ctx, baseURL, http.MethodGet, "/Users", apiKey, nil, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (c *Client) DeleteUser(ctx context.Context, baseURL, apiKey, userID string) error {
+	return c.DoJSON(ctx, baseURL, http.MethodDelete, "/Users/"+url.PathEscape(userID), apiKey, nil, nil)
+}
+
 func (c *Client) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID string, tmpl db.Template) error {
 	var policy map[string]any
 	if err := json.Unmarshal([]byte(tmpl.PolicyJSON), &policy); err != nil {

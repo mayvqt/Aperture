@@ -139,3 +139,10 @@ type Webhook struct {
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
+
+type ManagedUser struct {
+	ExternalUserID string
+	Username       string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}

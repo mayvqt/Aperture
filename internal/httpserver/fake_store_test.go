@@ -16,6 +16,7 @@ type fakeStore struct {
 	invites               []db.Invite
 	registrations         []db.Registration
 	deletedRegistrationID int64
+	managedUsers          []db.ManagedUser
 	inviteActivity        map[int64]db.InviteActivity
 	createdInvite         db.Invite
 	createdTemplate       db.Template
@@ -265,6 +266,30 @@ func (f *fakeStore) Registration(_ context.Context, id int64) (db.Registration, 
 func (f *fakeStore) DeleteRegistration(_ context.Context, id int64) error {
 	f.deletedRegistrationID = id
 	return nil
+}
+func (f *fakeStore) ListManagedUsers(context.Context) ([]db.ManagedUser, error) {
+	return f.managedUsers, nil
+}
+func (f *fakeStore) ManagedUser(_ context.Context, id string) (db.ManagedUser, error) {
+	for _, user := range f.managedUsers {
+		if user.ExternalUserID == id {
+			return user, nil
+		}
+	}
+	return db.ManagedUser{}, db.ErrNotFound
+}
+func (f *fakeStore) SaveManagedUser(_ context.Context, user db.ManagedUser) error {
+	f.managedUsers = append(f.managedUsers, user)
+	return nil
+}
+func (f *fakeStore) DeleteManagedUser(_ context.Context, id string) error {
+	for i, user := range f.managedUsers {
+		if user.ExternalUserID == id {
+			f.managedUsers = append(f.managedUsers[:i], f.managedUsers[i+1:]...)
+			return nil
+		}
+	}
+	return db.ErrNotFound
 }
 func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error) {
 	recovery := f.recovery

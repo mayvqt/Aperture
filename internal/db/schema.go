@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const schemaRevision = 3
+const schemaRevision = 4
 
 const schema = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -106,6 +106,13 @@ CREATE TABLE IF NOT EXISTS webhooks (
     updated_at DATETIME NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS managed_users (
+    external_user_id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_invites_status ON invites(enabled, deleted_at, expires_at, uses, max_uses);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_one_default ON templates(is_default) WHERE is_default = 1;
 CREATE INDEX IF NOT EXISTS idx_registrations_invite_id ON registrations(invite_id);
@@ -170,7 +177,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 	`); err != nil {
 		return fmt.Errorf("seed default template: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 3`); err != nil {
+	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 4`); err != nil {
 		return fmt.Errorf("record schema revision: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
