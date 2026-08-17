@@ -580,3 +580,25 @@ pre {
     display: block;
     margin-top: 3px;
 }
+
+.audit-table table {
+    min-width: 760px;
+}
+
+.audit-table time {
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.audit-details summary {
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.audit-details pre {
+    margin-top: 8px;
+    max-width: 420px;
+    max-height: 240px;
+    overflow: auto;
+}

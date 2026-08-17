@@ -1,10 +1,12 @@
 package httpserver
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"strings"
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
@@ -122,6 +124,33 @@ var templateFuncs = template.FuncMap{
 		return value
 	},
 	"templateSummary": templateSummary,
+	"auditAction": func(value string) string {
+		parts := strings.FieldsFunc(value, func(r rune) bool { return r == '.' || r == '_' })
+		for i := range parts {
+			parts[i] = strings.ToUpper(parts[i][:1]) + parts[i][1:]
+		}
+		return strings.Join(parts, " ")
+	},
+	"shortID": func(value string) string {
+		if len(value) <= 10 {
+			return value
+		}
+		return value[:8] + "…"
+	},
+	"dateTime": func(value time.Time) string {
+		return value.UTC().Format("2006-01-02 15:04 UTC")
+	},
+	"hasMetadata": func(value string) bool {
+		value = strings.TrimSpace(value)
+		return value != "" && value != "{}" && value != "null"
+	},
+	"prettyJSON": func(value string) string {
+		var out bytes.Buffer
+		if json.Indent(&out, []byte(value), "", "  ") == nil {
+			return out.String()
+		}
+		return value
+	},
 }
 
 func templateSummary(t db.Template) []templateSummaryItem {

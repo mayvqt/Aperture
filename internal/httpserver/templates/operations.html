@@ -5,6 +5,18 @@
 {{template "base-end" .}}{{end}}
 
 {{define "audit"}}{{template "base-start" .}}
-<div class="page-head"><div><p class="eyebrow">Operations</p><h1>Audit log</h1><p>The latest administrative and registration activity.</p></div></div>
-<div class="table-wrap"><table><thead><tr><th>Time</th><th>Action</th><th>Actor</th><th>Target</th><th>IP</th><th>Metadata</th></tr></thead><tbody>{{range .AuditEvents}}<tr><td>{{.CreatedAt}}</td><td><code>{{.Action}}</code></td><td>{{if .ActorUserID}}{{.ActorUserID}}{{else}}Public{{end}}</td><td>{{.TargetType}} {{.TargetID}}</td><td>{{.IPAddress}}</td><td><code>{{.MetadataJSON}}</code></td></tr>{{else}}<tr><td colspan="6">No audit events yet.</td></tr>{{end}}</tbody></table></div>
+<div class="page-head">
+    <div><p class="eyebrow">Operations</p><h1>Audit log</h1><p>The latest administrative and registration activity.</p></div>
+</div>
+<div class="table-wrap audit-table"><table>
+    <thead><tr><th>When</th><th>Activity</th><th>Actor</th><th>Target</th><th>Source</th><th></th></tr></thead>
+    <tbody>{{range .AuditEvents}}<tr>
+        <td><time datetime="{{.CreatedAt}}">{{dateTime .CreatedAt}}</time></td>
+        <td><strong>{{auditAction .Action}}</strong></td>
+        <td>{{if .ActorUserID}}<span title="{{.ActorUserID}}">{{shortID .ActorUserID}}</span>{{else}}Public{{end}}</td>
+        <td>{{if .TargetType}}{{.TargetType}} {{.TargetID}}{{else}}—{{end}}</td>
+        <td>{{if .IPAddress}}<code>{{.IPAddress}}</code>{{else}}—{{end}}</td>
+        <td>{{if hasMetadata .MetadataJSON}}<details class="audit-details"><summary>Details</summary><pre>{{prettyJSON .MetadataJSON}}</pre></details>{{end}}</td>
+    </tr>{{else}}<tr><td colspan="6">No audit events yet.</td></tr>{{end}}</tbody>
+</table></div>
 {{template "base-end" .}}{{end}}
