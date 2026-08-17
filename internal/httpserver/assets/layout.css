@@ -101,7 +101,7 @@ nav a:hover, nav button:hover {
 }
 
 main {
-    max-width: 1180px;
+    max-width: 1120px;
     margin: 0 auto;
     min-height: calc(100vh - 61px);
     padding: 34px 28px 72px;
@@ -129,4 +129,8 @@ h3 {
 p {
     color: var(--muted);
     line-height: 1.55;
+}
+
+.page-head > div > p:not(.eyebrow) {
+    max-width: 620px;
 }

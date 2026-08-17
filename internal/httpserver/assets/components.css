@@ -249,11 +249,10 @@ pre {
 }
 
 .panel {
-    background: linear-gradient(180deg, var(--panel), #111821);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: var(--shadow-soft);
+    background: rgba(20, 27, 36, .72);
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    padding: 22px;
 }
 
 .panel h2:first-child, .panel h3:first-child {
@@ -278,16 +277,21 @@ pre {
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.metric {
-    background: linear-gradient(180deg, #151e29, #101720);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 17px;
-    box-shadow: var(--shadow-soft);
+.stats-grid {
+    gap: 0;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: rgba(20, 27, 36, .56);
+    overflow: hidden;
 }
 
-.metric:hover {
-    border-color: #34445a;
+.metric {
+    padding: 16px 18px;
+    border-right: 1px solid var(--line-soft);
+}
+
+.metric:last-child {
+    border-right: 0;
 }
 
 .metric strong {
@@ -468,10 +472,9 @@ pre {
     display: grid;
     gap: 13px;
     padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: linear-gradient(180deg, var(--panel), #111821);
-    box-shadow: var(--shadow-soft);
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: rgba(20, 27, 36, .68);
 }
 
 .invite-card-head {
