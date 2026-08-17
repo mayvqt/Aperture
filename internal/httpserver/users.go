@@ -1,7 +1,9 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"sort"
 	"strings"
@@ -9,6 +11,8 @@ import (
 	"github.com/mayvqt/aperture/internal/db"
 	"github.com/mayvqt/aperture/internal/mediaserver"
 )
+
+var errAdministratorDelete = errors.New("cannot delete a media-server administrator")
 
 func (s *Server) usersList(w http.ResponseWriter, r *http.Request, session db.Session) {
 	settings, err := s.settings(r.Context())
@@ -116,4 +120,65 @@ func mergeUserRows(live []mediaserver.User, managed []db.ManagedUser, registrati
 func userIsAdministrator(user mediaserver.User) bool {
 	var policy mediaserver.Policy
 	return json.Unmarshal(user.Policy, &policy) == nil && policy.IsAdministrator
+}
+
+func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		s.message(w, "Invalid user", "That user does not exist.", http.StatusBadRequest)
+		return
+	}
+	settings, err := s.settings(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	deletedUpstream, err := s.deleteUserAndRecords(r.Context(), settings, id)
+	if err != nil {
+		s.userDeleteError(w, err, deletedUpstream)
+		return
+	}
+	s.audit(r, session, "user.delete", "user", id, map[string]any{"deleted_from_media_server": deletedUpstream})
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings, id string) (bool, error) {
+	users, err := s.media.ListUsers(ctx, settings.ServerURL, settings.APIKey)
+	if err != nil {
+		return false, err
+	}
+	deletedUpstream := false
+	for _, user := range users {
+		if user.ID != id {
+			continue
+		}
+		if userIsAdministrator(user) {
+			return false, errAdministratorDelete
+		}
+		if err := s.media.DeleteUser(ctx, settings.ServerURL, settings.APIKey, id); err != nil {
+			var httpErr *mediaserver.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusNotFound {
+				return false, err
+			}
+		} else {
+			deletedUpstream = true
+		}
+		break
+	}
+	if err := s.store.DeleteUserRecords(ctx, id); err != nil {
+		return deletedUpstream, err
+	}
+	return deletedUpstream, nil
+}
+
+func (s *Server) userDeleteError(w http.ResponseWriter, err error, deletedUpstream bool) {
+	if errors.Is(err, errAdministratorDelete) {
+		s.message(w, "Cannot delete administrator", "Aperture does not delete media-server administrator accounts.", http.StatusConflict)
+		return
+	}
+	if deletedUpstream {
+		s.message(w, "Local cleanup failed", "The media-server account was deleted, but Aperture could not remove its local records. Try again.", http.StatusInternalServerError)
+		return
+	}
+	s.message(w, "Could not delete user", "The media-server account and local records were left unchanged. Try again shortly.", http.StatusBadGateway)
 }

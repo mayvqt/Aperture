@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mayvqt/aperture/internal/db"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 )
 
 func TestRegistrationTemplateRetryUsesSavedSnapshot(t *testing.T) {
@@ -95,19 +96,18 @@ func TestRegistrationTemplateRetryRecordsFailure(t *testing.T) {
 	}
 }
 
-func TestRegistrationDeleteRequiresMediaUserToBeAbsent(t *testing.T) {
+func TestRegistrationDeleteRemovesUpstreamUserWhenPresent(t *testing.T) {
 	for _, test := range []struct {
-		name       string
-		userExists bool
-		wantStatus int
-		wantDelete bool
+		name               string
+		liveUsers          []mediaserver.User
+		wantUpstreamDelete bool
 	}{
-		{name: "user already deleted", wantStatus: http.StatusSeeOther, wantDelete: true},
-		{name: "user still exists", userExists: true, wantStatus: http.StatusConflict},
+		{name: "user already deleted"},
+		{name: "user still exists", liveUsers: []mediaserver.User{{ID: "media-alice", Name: "alice"}}, wantUpstreamDelete: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			store := newFakeStore()
-			media := &fakeMediaServer{userExists: test.userExists}
+			media := &fakeMediaServer{users: test.liveUsers}
 			handler := New(testConfig(), store, media)
 			form := url.Values{"csrf": {store.session.CSRFSecret}}
 			req := adminRequest(t, http.MethodPost, "/admin/registrations/1/delete", strings.NewReader(form.Encode()))
@@ -116,11 +116,14 @@ func TestRegistrationDeleteRequiresMediaUserToBeAbsent(t *testing.T) {
 
 			handler.ServeHTTP(rr, req)
 
-			if rr.Code != test.wantStatus {
-				t.Fatalf("status = %d, want %d; body %s", rr.Code, test.wantStatus, rr.Body.String())
+			if rr.Code != http.StatusSeeOther {
+				t.Fatalf("status = %d, want 303; body %s", rr.Code, rr.Body.String())
 			}
-			if got := store.deletedRegistrationID == 1; got != test.wantDelete {
-				t.Fatalf("deleted = %t, want %t", got, test.wantDelete)
+			if got := media.deletedUserID != ""; got != test.wantUpstreamDelete {
+				t.Fatalf("upstream deleted = %t, want %t", got, test.wantUpstreamDelete)
+			}
+			if len(store.registrations) != 0 {
+				t.Fatalf("local registrations remain: %#v", store.registrations)
 			}
 		})
 	}

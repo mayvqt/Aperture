@@ -56,3 +56,18 @@ func (s *Store) ManagedUser(ctx context.Context, externalUserID string) (Managed
 	}
 	return user, err
 }
+
+func (s *Store) DeleteUserRecords(ctx context.Context, externalUserID string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM registrations WHERE external_user_id = ?`, externalUserID); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM managed_users WHERE external_user_id = ?`, externalUserID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}

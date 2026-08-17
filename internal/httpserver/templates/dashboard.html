@@ -97,7 +97,7 @@
                     </td>
                     <td>{{nullDate .UserDisableAt}}</td>
                     <td>{{nullDateTime .NextDisableAttemptAt}}</td>
-                    <td><form action="/admin/registrations/{{.ID}}/delete" data-confirm="Remove this registration record? The media-server user must already be deleted." method="post">
+                    <td><form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}"><input name="return_to" type="hidden" value="/admin">
                         <button class="danger small">Remove</button>
                     </form></td>
@@ -199,7 +199,7 @@
                     <button class="small">Retry access</button>
                 </form>
                 {{end}}
-                <form action="/admin/registrations/{{.ID}}/delete" data-confirm="Remove this registration record? The media-server user must already be deleted." method="post">
+                <form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="danger small">Remove</button>
                 </form></div></td>

@@ -294,6 +294,19 @@ func (f *fakeStore) DeleteManagedUser(_ context.Context, id string) error {
 	}
 	return db.ErrNotFound
 }
+func (f *fakeStore) DeleteUserRecords(_ context.Context, id string) error {
+	for i := len(f.registrations) - 1; i >= 0; i-- {
+		if f.registrations[i].ExternalUserID.String == id {
+			f.registrations = append(f.registrations[:i], f.registrations[i+1:]...)
+		}
+	}
+	for i := len(f.managedUsers) - 1; i >= 0; i-- {
+		if f.managedUsers[i].ExternalUserID == id {
+			f.managedUsers = append(f.managedUsers[:i], f.managedUsers[i+1:]...)
+		}
+	}
+	return nil
+}
 func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error) {
 	recovery := f.recovery
 	recovery.Registration.Status = db.RegistrationRetryingTemplate

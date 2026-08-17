@@ -71,6 +71,7 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 		s.registrationRecoveryError(w, err)
 		return
 	}
+	deletedUpstream := false
 	if registration.ExternalUserID.Valid && strings.TrimSpace(registration.ExternalUserID.String) != "" {
 		settings, err := s.settings(r.Context())
 		if err != nil {
@@ -81,21 +82,16 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 			s.message(w, "API key required", "Aperture must verify that the media-server user has been deleted first.", http.StatusConflict)
 			return
 		}
-		exists, err := s.media.UserExists(r.Context(), settings.ServerURL, settings.APIKey, registration.ExternalUserID.String)
+		deletedUpstream, err = s.deleteUserAndRecords(r.Context(), settings, registration.ExternalUserID.String)
 		if err != nil {
-			s.message(w, "Could not verify user", "Aperture could not check the media server. Try again shortly.", http.StatusBadGateway)
+			s.userDeleteError(w, err, deletedUpstream)
 			return
 		}
-		if exists {
-			s.message(w, "User still exists", "Delete the user from the media server before removing this registration record.", http.StatusConflict)
-			return
-		}
-	}
-	if err := s.store.DeleteRegistration(r.Context(), id); err != nil {
+	} else if err := s.store.DeleteRegistration(r.Context(), id); err != nil {
 		s.registrationRecoveryError(w, err)
 		return
 	}
-	s.audit(r, session, "registration.delete", "registration", strconv.FormatInt(id, 10), map[string]any{"username": registration.Username})
+	s.audit(r, session, "registration.delete", "registration", strconv.FormatInt(id, 10), map[string]any{"username": registration.Username, "deleted_from_media_server": deletedUpstream})
 	destination := "/admin/registrations"
 	if r.FormValue("return_to") == "/admin" {
 		destination = "/admin"
