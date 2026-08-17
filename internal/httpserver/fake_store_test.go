@@ -255,6 +255,9 @@ func (f *fakeStore) Audit(context.Context, string, string, string, string, strin
 func (f *fakeStore) RecentRegistrations(context.Context, int) ([]db.Registration, error) {
 	return f.registrations, nil
 }
+func (f *fakeStore) RegistrationUsers(context.Context) ([]db.Registration, error) {
+	return f.registrations, nil
+}
 func (f *fakeStore) Registration(_ context.Context, id int64) (db.Registration, error) {
 	for _, registration := range f.registrations {
 		if registration.ID == id {

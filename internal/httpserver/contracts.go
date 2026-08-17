@@ -40,6 +40,7 @@ type Store interface {
 	DeleteInvite(context.Context, int64) error
 	Audit(context.Context, string, string, string, string, string, string, string) error
 	RecentRegistrations(context.Context, int) ([]db.Registration, error)
+	RegistrationUsers(context.Context) ([]db.Registration, error)
 	Registration(context.Context, int64) (db.Registration, error)
 	DeleteRegistration(context.Context, int64) error
 	ListManagedUsers(context.Context) ([]db.ManagedUser, error)

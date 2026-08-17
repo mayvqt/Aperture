@@ -145,6 +145,29 @@ func (s *Store) RecentRegistrations(ctx context.Context, limit int) ([]Registrat
 	return regs, rows.Err()
 }
 
+func (s *Store) RegistrationUsers(ctx context.Context) ([]Registration, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT `+registrationColumns+`
+		FROM registrations
+		WHERE external_user_id IS NOT NULL
+		  AND id IN (SELECT MAX(id) FROM registrations WHERE external_user_id IS NOT NULL GROUP BY external_user_id)
+		ORDER BY username COLLATE NOCASE
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var registrations []Registration
+	for rows.Next() {
+		registration, err := scanRegistration(rows)
+		if err != nil {
+			return nil, err
+		}
+		registrations = append(registrations, registration)
+	}
+	return registrations, rows.Err()
+}
+
 func (s *Store) Registration(ctx context.Context, id int64) (Registration, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE id = ?`, id)
 	registration, err := scanRegistration(row)

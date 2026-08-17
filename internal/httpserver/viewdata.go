@@ -31,6 +31,19 @@ type viewData struct {
 	Webhooks         []db.Webhook
 	AuditEvents      []db.AuditEvent
 	WebhookEvents    []webhookEventOption
+	UserRows         []managedUserRow
+}
+
+type managedUserRow struct {
+	ID             string
+	Name           string
+	Source         string
+	Status         string
+	StatusClass    string
+	Tracked        bool
+	Missing        bool
+	Administrator  bool
+	RegistrationID int64
 }
 
 type webhookEventOption struct{ Value, Label string }
