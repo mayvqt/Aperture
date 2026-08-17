@@ -48,14 +48,14 @@ func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 	store := newFakeStore()
 	handler := New(testConfig(), store, &fakeMediaServer{})
 
-	assetReq := httptest.NewRequest(http.MethodGet, "/assets/app.css", nil)
+	assetReq := httptest.NewRequest(http.MethodGet, "/assets/base.css", nil)
 	assetRR := httptest.NewRecorder()
 	handler.ServeHTTP(assetRR, assetReq)
 	if assetRR.Code != http.StatusOK {
 		t.Fatalf("asset status = %d, want 200; body %s", assetRR.Code, assetRR.Body.String())
 	}
-	if !strings.Contains(assetRR.Body.String(), "/assets/base.css") {
-		t.Fatalf("asset body missing expected CSS:\n%s", assetRR.Body.String())
+	if got := assetRR.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Fatalf("asset Cache-Control = %q, want no-cache", got)
 	}
 
 	pageReq := adminRequest(t, http.MethodGet, "/admin", nil)
@@ -73,7 +73,7 @@ func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 		t.Fatalf("X-Frame-Options = %q", got)
 	}
 	body := pageRR.Body.String()
-	if !strings.Contains(body, `href="/assets/app.css"`) || !strings.Contains(body, `src="/assets/app.js"`) {
+	if !strings.Contains(body, `href="/assets/base.css"`) || !strings.Contains(body, `href="/assets/responsive.css"`) || !strings.Contains(body, `src="/assets/app.js"`) {
 		t.Fatalf("page missing external asset references:\n%s", body)
 	}
 }
