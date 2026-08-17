@@ -20,3 +20,31 @@ document.addEventListener("submit", function (event) {
         event.preventDefault();
     }
 });
+
+(function () {
+    var button = document.querySelector(".nav-more-button");
+    var menu = document.getElementById("admin-more-menu");
+    if (!button || !menu) return;
+
+    function closeMenu() {
+        button.setAttribute("aria-expanded", "false");
+        menu.hidden = true;
+    }
+
+    button.addEventListener("click", function () {
+        var opening = button.getAttribute("aria-expanded") !== "true";
+        button.setAttribute("aria-expanded", String(opening));
+        menu.hidden = !opening;
+    });
+
+    document.addEventListener("click", function (event) {
+        if (!event.target.closest(".nav-more")) closeMenu();
+    });
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && !menu.hidden) {
+            closeMenu();
+            button.focus();
+        }
+    });
+})();

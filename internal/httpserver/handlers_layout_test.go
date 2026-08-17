@@ -25,6 +25,14 @@ func TestAdminNavShowsDashboardWithoutBrandIcon(t *testing.T) {
 	if strings.Contains(body, "brand-mark") {
 		t.Fatalf("body still contains global A icon markup:\n%s", body)
 	}
+	for _, want := range []string{`class="nav-more-button"`, `aria-expanded="false"`, `aria-controls="admin-more-menu"`, `id="admin-more-menu"`, `hidden`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing accessible More menu markup %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "<details") || strings.Contains(body, "<summary") {
+		t.Fatalf("body still uses native disclosure menu:\n%s", body)
+	}
 }
 
 func TestAuthPagesUseFullViewportShell(t *testing.T) {
