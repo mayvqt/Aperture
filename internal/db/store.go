@@ -23,6 +23,10 @@ type Store struct {
 }
 
 func Open(path string, encryptionKey string) (*Store, error) {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("resolve database path: %w", err)
+	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create database directory %s: %w", dir, err)
@@ -54,7 +58,11 @@ func Open(path string, encryptionKey string) (*Store, error) {
 }
 
 func sqliteDSN(path string) string {
-	u := &url.URL{Scheme: "file", Path: path}
+	urlPath := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" && urlPath[0] != '/' {
+		urlPath = "/" + urlPath
+	}
+	u := &url.URL{Scheme: "file", Path: urlPath}
 	query := u.Query()
 	query.Add("_pragma", "busy_timeout(5000)")
 	query.Add("_pragma", "foreign_keys(1)")

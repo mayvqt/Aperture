@@ -3,6 +3,7 @@ package db
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -36,7 +37,7 @@ func TestOpenAppliesSQLiteConnectionPolicyAndRestrictsDatabaseFile(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("database mode = %o, want 600", got)
 	}
 	for _, suffix := range []string{"-wal", "-shm"} {
@@ -47,7 +48,7 @@ func TestOpenAppliesSQLiteConnectionPolicyAndRestrictsDatabaseFile(t *testing.T)
 			}
 			t.Fatal(err)
 		}
-		if got := info.Mode().Perm(); got != 0o600 {
+		if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 			t.Fatalf("%s mode = %o, want 600", suffix, got)
 		}
 	}
