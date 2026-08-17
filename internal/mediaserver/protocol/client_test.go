@@ -34,7 +34,7 @@ func TestPingReturnsTypedHTTPError(t *testing.T) {
 	}
 }
 
-func TestUserExistsTreatsOnlyNotFoundAsAbsent(t *testing.T) {
+func TestGetUserTreatsOnlyNotFoundAsAbsent(t *testing.T) {
 	for _, test := range []struct {
 		status  int
 		want    bool
@@ -48,10 +48,32 @@ func TestUserExistsTreatsOnlyNotFoundAsAbsent(t *testing.T) {
 			body := `{}`
 			return response(test.status, body), nil
 		})})
-		got, err := client.UserExists(t.Context(), "http://media.test", "key", "user-1")
+		_, got, err := client.GetUser(t.Context(), "http://media.test", "key", "user-1")
 		if got != test.want || (err != nil) != test.wantErr {
-			t.Fatalf("status %d: exists/error = %t/%v", test.status, got, err)
+			t.Fatalf("status %d: found/error = %t/%v", test.status, got, err)
 		}
+	}
+}
+
+func TestListAndDeleteUsersUseExpectedEndpoints(t *testing.T) {
+	var requests []string
+	client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		requests = append(requests, r.Method+" "+r.URL.EscapedPath())
+		if r.Method == http.MethodGet {
+			return response(http.StatusOK, `[{"Id":"user-1","Name":"Alice"}]`), nil
+		}
+		return response(http.StatusNoContent, ""), nil
+	})})
+	users, err := client.ListUsers(t.Context(), "http://media.test", "key")
+	if err != nil || len(users) != 1 || users[0].ID != "user-1" {
+		t.Fatalf("users/error = %#v/%v", users, err)
+	}
+	if err := client.DeleteUser(t.Context(), "http://media.test", "key", "user 1"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"GET /Users", "DELETE /Users/user%201"}
+	if len(requests) != len(want) || requests[0] != want[0] || requests[1] != want[1] {
+		t.Fatalf("requests = %#v, want %#v", requests, want)
 	}
 }
 

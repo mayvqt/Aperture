@@ -48,3 +48,19 @@ func TestInitSchemaRejectsPreV1Database(t *testing.T) {
 		t.Fatalf("legacy database error = %v", err)
 	}
 }
+
+func TestInitSchemaMigratesRevisionThreeWithManagedUsers(t *testing.T) {
+	ctx, store := testStore(t)
+	if _, err := store.db.ExecContext(ctx, `DROP TABLE managed_users`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(ctx, `PRAGMA user_version = 3`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InitSchema(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveManagedUser(ctx, ManagedUser{ExternalUserID: "user-1", Username: "Alice"}); err != nil {
+		t.Fatalf("managed_users was not created during migration: %v", err)
+	}
+}

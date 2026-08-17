@@ -44,9 +44,7 @@ type Store interface {
 	Registration(context.Context, int64) (db.Registration, error)
 	DeleteRegistration(context.Context, int64) error
 	ListManagedUsers(context.Context) ([]db.ManagedUser, error)
-	ManagedUser(context.Context, string) (db.ManagedUser, error)
 	SaveManagedUser(context.Context, db.ManagedUser) error
-	DeleteManagedUser(context.Context, string) error
 	DeleteUserRecords(context.Context, string) error
 	ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error)
 	RecordTemplateRetryFailure(context.Context, int64, string) error

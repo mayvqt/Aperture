@@ -72,8 +72,8 @@ func (s *Server) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID stri
 func (s *Server) DisableUser(ctx context.Context, baseURL, apiKey, userID string) error {
 	return s.current().DisableUser(ctx, baseURL, apiKey, userID)
 }
-func (s *Server) UserExists(ctx context.Context, baseURL, apiKey, userID string) (bool, error) {
-	return s.current().UserExists(ctx, baseURL, apiKey, userID)
+func (s *Server) GetUser(ctx context.Context, baseURL, apiKey, userID string) (mediaserver.User, bool, error) {
+	return s.current().GetUser(ctx, baseURL, apiKey, userID)
 }
 func (s *Server) ListUsers(ctx context.Context, baseURL, apiKey string) ([]mediaserver.User, error) {
 	return s.current().ListUsers(ctx, baseURL, apiKey)

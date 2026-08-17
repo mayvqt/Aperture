@@ -29,10 +29,9 @@ type fakeMediaServer struct {
 	pingStartOnce   sync.Once
 	pingAPIKey      atomic.Value
 	provider        mediaserver.Provider
-	userExists      bool
-	userExistsErr   error
 	users           []mediaserver.User
 	deletedUserID   string
+	disableErr      error
 }
 
 func (f *fakeMediaServer) SetProvider(provider mediaserver.Provider) error {
@@ -78,10 +77,15 @@ func (f *fakeMediaServer) ApplyTemplate(_ context.Context, _, _, userID string, 
 }
 func (f *fakeMediaServer) DisableUser(_ context.Context, _ string, _ string, userID string) error {
 	f.disabledUserID = userID
-	return nil
+	return f.disableErr
 }
-func (f *fakeMediaServer) UserExists(context.Context, string, string, string) (bool, error) {
-	return f.userExists, f.userExistsErr
+func (f *fakeMediaServer) GetUser(_ context.Context, _, _, id string) (mediaserver.User, bool, error) {
+	for _, user := range f.users {
+		if user.ID == id {
+			return user, true, nil
+		}
+	}
+	return mediaserver.User{}, false, nil
 }
 func (f *fakeMediaServer) ListUsers(context.Context, string, string) ([]mediaserver.User, error) {
 	return f.users, nil

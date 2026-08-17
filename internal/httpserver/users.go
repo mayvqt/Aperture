@@ -51,28 +51,25 @@ func (s *Server) usersTrack(w http.ResponseWriter, r *http.Request, session db.S
 		s.error(w, err)
 		return
 	}
-	users, err := s.media.ListUsers(r.Context(), settings.ServerURL, settings.APIKey)
+	user, found, err := s.media.GetUser(r.Context(), settings.ServerURL, settings.APIKey, id)
 	if err != nil {
 		s.message(w, "Could not synchronize users", "Aperture could not verify that user.", http.StatusBadGateway)
 		return
 	}
-	for _, user := range users {
-		if user.ID != id {
-			continue
-		}
-		if userIsAdministrator(user) {
-			s.message(w, "Cannot manage administrator", "Aperture does not manage media-server administrator accounts.", http.StatusConflict)
-			return
-		}
-		if err := s.store.SaveManagedUser(r.Context(), db.ManagedUser{ExternalUserID: user.ID, Username: user.Name}); err != nil {
-			s.error(w, err)
-			return
-		}
-		s.audit(r, session, "user.track", "user", user.ID, map[string]any{"username": user.Name})
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	if !found {
+		s.message(w, "User not found", "That user no longer exists on the media server.", http.StatusNotFound)
 		return
 	}
-	s.message(w, "User not found", "That user no longer exists on the media server.", http.StatusNotFound)
+	if userIsAdministrator(user) {
+		s.message(w, "Cannot manage administrator", "Aperture does not manage media-server administrator accounts.", http.StatusConflict)
+		return
+	}
+	if err := s.store.SaveManagedUser(r.Context(), db.ManagedUser{ExternalUserID: user.ID, Username: user.Name}); err != nil {
+		s.error(w, err)
+		return
+	}
+	s.audit(r, session, "user.track", "user", user.ID, map[string]any{"username": user.Name})
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func mergeUserRows(live []mediaserver.User, managed []db.ManagedUser, registrations []db.Registration) []managedUserRow {
@@ -143,15 +140,12 @@ func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.
 }
 
 func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings, id string) (bool, error) {
-	users, err := s.media.ListUsers(ctx, settings.ServerURL, settings.APIKey)
+	user, found, err := s.media.GetUser(ctx, settings.ServerURL, settings.APIKey, id)
 	if err != nil {
 		return false, err
 	}
 	deletedUpstream := false
-	for _, user := range users {
-		if user.ID != id {
-			continue
-		}
+	if found {
 		if userIsAdministrator(user) {
 			return false, errAdministratorDelete
 		}
@@ -163,7 +157,6 @@ func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings,
 		} else {
 			deletedUpstream = true
 		}
-		break
 	}
 	if err := s.store.DeleteUserRecords(ctx, id); err != nil {
 		return deletedUpstream, err

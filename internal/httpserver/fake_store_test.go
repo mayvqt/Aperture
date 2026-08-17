@@ -26,6 +26,7 @@ type fakeStore struct {
 	completedDisableAt    sql.NullTime
 	dueDisables           []db.Registration
 	markedDisabledID      int64
+	failedDisableID       int64
 	inviteErr             error
 	templateErr           error
 	reservedInviteUse     bool
@@ -246,9 +247,12 @@ func (f *fakeStore) MarkUserDisabled(_ context.Context, registrationID int64) er
 	f.markedDisabledID = registrationID
 	return nil
 }
-func (f *fakeStore) MarkUserDisableFailed(context.Context, int64, string) error { return nil }
-func (f *fakeStore) SetInviteEnabled(context.Context, int64, bool) error        { return nil }
-func (f *fakeStore) DeleteInvite(context.Context, int64) error                  { return nil }
+func (f *fakeStore) MarkUserDisableFailed(_ context.Context, id int64, _ string) error {
+	f.failedDisableID = id
+	return nil
+}
+func (f *fakeStore) SetInviteEnabled(context.Context, int64, bool) error { return nil }
+func (f *fakeStore) DeleteInvite(context.Context, int64) error           { return nil }
 func (f *fakeStore) Audit(context.Context, string, string, string, string, string, string, string) error {
 	return nil
 }
@@ -273,26 +277,15 @@ func (f *fakeStore) DeleteRegistration(_ context.Context, id int64) error {
 func (f *fakeStore) ListManagedUsers(context.Context) ([]db.ManagedUser, error) {
 	return f.managedUsers, nil
 }
-func (f *fakeStore) ManagedUser(_ context.Context, id string) (db.ManagedUser, error) {
-	for _, user := range f.managedUsers {
-		if user.ExternalUserID == id {
-			return user, nil
-		}
-	}
-	return db.ManagedUser{}, db.ErrNotFound
-}
 func (f *fakeStore) SaveManagedUser(_ context.Context, user db.ManagedUser) error {
-	f.managedUsers = append(f.managedUsers, user)
-	return nil
-}
-func (f *fakeStore) DeleteManagedUser(_ context.Context, id string) error {
-	for i, user := range f.managedUsers {
-		if user.ExternalUserID == id {
-			f.managedUsers = append(f.managedUsers[:i], f.managedUsers[i+1:]...)
+	for i := range f.managedUsers {
+		if f.managedUsers[i].ExternalUserID == user.ExternalUserID {
+			f.managedUsers[i] = user
 			return nil
 		}
 	}
-	return db.ErrNotFound
+	f.managedUsers = append(f.managedUsers, user)
+	return nil
 }
 func (f *fakeStore) DeleteUserRecords(_ context.Context, id string) error {
 	for i := len(f.registrations) - 1; i >= 0; i-- {

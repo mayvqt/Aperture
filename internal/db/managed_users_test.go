@@ -19,10 +19,14 @@ func TestManagedUserRoundTrip(t *testing.T) {
 	if len(users) != 1 || users[0].Username != user.Username {
 		t.Fatalf("users = %#v", users)
 	}
-	if err := store.DeleteManagedUser(ctx, user.ExternalUserID); err != nil {
+	if err := store.DeleteUserRecords(ctx, user.ExternalUserID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ManagedUser(ctx, user.ExternalUserID); err != ErrNotFound {
-		t.Fatalf("lookup after delete error = %v, want ErrNotFound", err)
+	users, err = store.ListManagedUsers(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(users) != 0 {
+		t.Fatalf("users after delete = %#v", users)
 	}
 }

@@ -116,16 +116,17 @@ func (c *Client) DisableUser(ctx context.Context, baseURL, apiKey, userID string
 	return c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/"+url.PathEscape(userID)+"/Policy", apiKey, policy, nil)
 }
 
-func (c *Client) UserExists(ctx context.Context, baseURL, apiKey, userID string) (bool, error) {
-	err := c.DoJSON(ctx, baseURL, http.MethodGet, "/Users/"+url.PathEscape(userID), apiKey, nil, &struct{}{})
+func (c *Client) GetUser(ctx context.Context, baseURL, apiKey, userID string) (mediaserver.User, bool, error) {
+	var user mediaserver.User
+	err := c.DoJSON(ctx, baseURL, http.MethodGet, "/Users/"+url.PathEscape(userID), apiKey, nil, &user)
 	if err == nil {
-		return true, nil
+		return user, true, nil
 	}
 	var httpErr *mediaserver.HTTPError
 	if errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound {
-		return false, nil
+		return mediaserver.User{}, false, nil
 	}
-	return false, err
+	return mediaserver.User{}, false, err
 }
 
 func (c *Client) ListUsers(ctx context.Context, baseURL, apiKey string) ([]mediaserver.User, error) {
