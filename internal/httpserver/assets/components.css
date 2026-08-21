@@ -421,10 +421,6 @@ pre {
     min-width: 0;
 }
 
-.template-workflows form {
-    max-width: none;
-}
-
 .workflow-card,
 .templates-list {
     padding: 0;
@@ -517,7 +513,8 @@ pre {
     transform: rotate(225deg) translate(-2px, -2px);
 }
 
-.workflow-form {
+.workflow-body {
+    max-width: none;
     margin: 0 20px 20px;
     padding-top: 18px;
     border-top: 1px solid var(--line-soft);

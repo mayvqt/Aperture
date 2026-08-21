@@ -8,7 +8,7 @@
             <span class="workflow-heading"><span class="workflow-icon">+</span><span><strong>Add webhook</strong><small>Connect Discord or a generic JSON endpoint</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
-        <form action="/admin/webhooks" method="post" class="workflow-form">
+        <form action="/admin/webhooks" method="post" class="workflow-body">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Name<input name="name" maxlength="100" required placeholder="Operations"></label>
             <label>Type<select name="kind"><option value="discord">Discord</option><option value="generic">Generic JSON</option></select></label>

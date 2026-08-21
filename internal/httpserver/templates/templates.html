@@ -13,7 +13,7 @@
             <span class="workflow-heading"><span class="workflow-icon">+</span><span><strong>Create template</strong><small>Define a permission policy manually</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
-        <form action="/admin/templates" method="post" class="workflow-form">
+        <form action="/admin/templates" method="post" class="workflow-body">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Name<input maxlength="80" name="name" required>
             </label>
@@ -29,7 +29,7 @@
             <span class="workflow-heading"><span class="workflow-icon">&#8595;</span><span><strong>Import from user</strong><small>Copy an existing media-server policy</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
-        <form action="/admin/templates/import-from-user" method="post" class="workflow-form">
+        <form action="/admin/templates/import-from-user" method="post" class="workflow-body">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Template name<input maxlength="80" name="name" required>
             </label>
