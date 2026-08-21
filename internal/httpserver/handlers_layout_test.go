@@ -65,6 +65,12 @@ func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 	if got := assetRR.Header().Get("Cache-Control"); got != "public, max-age=31536000, immutable" {
 		t.Fatalf("asset Cache-Control = %q, want long-lived immutable caching", got)
 	}
+	scriptReq := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	scriptRR := httptest.NewRecorder()
+	handler.ServeHTTP(scriptRR, scriptReq)
+	if got := scriptRR.Header().Get("Cache-Control"); got != "public, max-age=31536000, immutable" {
+		t.Fatalf("script Cache-Control = %q, want long-lived immutable caching", got)
+	}
 
 	pageReq := adminRequest(t, http.MethodGet, "/admin", nil)
 	pageReq.Host = "aperture.example"
@@ -81,7 +87,7 @@ func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 		t.Fatalf("X-Frame-Options = %q", got)
 	}
 	body := pageRR.Body.String()
-	if !strings.Contains(body, `href="/assets/app.css?v=`) || !strings.Contains(body, `src="/assets/app.js"`) {
+	if !strings.Contains(body, `href="/assets/app.css?v=`) || !strings.Contains(body, `src="/assets/app.js?v=`) {
 		t.Fatalf("page missing external asset references:\n%s", body)
 	}
 }
