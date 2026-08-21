@@ -8,9 +8,12 @@
 </div>{{if .Error}}
 <div class="notice error">{{.Error}}</div>{{end}}
 <section class="stack template-workflows">
-    <div class="panel">
-        <h2>Create</h2>
-        <form action="/admin/templates" method="post">
+    <details class="panel workflow-card" open>
+        <summary>
+            <span class="workflow-heading"><span class="workflow-icon">+</span><span><strong>Create template</strong><small>Define a permission policy manually</small></span></span>
+            <span class="disclosure-icon" aria-hidden="true"></span>
+        </summary>
+        <form action="/admin/templates" method="post" class="workflow-form">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Name<input maxlength="80" name="name" required>
             </label>
@@ -20,10 +23,13 @@
             </label>
             <button>Create</button>
         </form>
-    </div>
-    <div class="panel">
-        <h2>Import</h2>
-        <form action="/admin/templates/import-from-user" method="post">
+    </details>
+    <details class="panel workflow-card">
+        <summary>
+            <span class="workflow-heading"><span class="workflow-icon">&#8595;</span><span><strong>Import from user</strong><small>Copy an existing media-server policy</small></span></span>
+            <span class="disclosure-icon" aria-hidden="true"></span>
+        </summary>
+        <form action="/admin/templates/import-from-user" method="post" class="workflow-form">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Template name<input maxlength="80" name="name" required>
             </label>
@@ -33,7 +39,7 @@
             </label>
             <button>Import</button>
         </form>
-    </div>
+    </details>
 </section>
 <section class="panel section templates-list">
 <div class="page-head"><h2>Existing templates</h2></div>

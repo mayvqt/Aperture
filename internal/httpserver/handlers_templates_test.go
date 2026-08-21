@@ -40,7 +40,7 @@ func TestTemplatesCreateStripsAdminPrivilege(t *testing.T) {
 	}
 }
 
-func TestTemplatesPageUsesStackedWorkflows(t *testing.T) {
+func TestTemplatesPageUsesExpandableWorkflows(t *testing.T) {
 	store := newFakeStore()
 	handler := New(testConfig(), store, &fakeMediaServer{})
 	rr := httptest.NewRecorder()
@@ -49,8 +49,11 @@ func TestTemplatesPageUsesStackedWorkflows(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d; body %s", rr.Code, rr.Body.String())
 	}
-	if !strings.Contains(rr.Body.String(), `class="stack template-workflows"`) || !strings.Contains(rr.Body.String(), "Existing templates") {
-		t.Fatalf("templates page is not using stacked workflow panels:\n%s", rr.Body.String())
+	body := rr.Body.String()
+	if !strings.Contains(body, `<details class="panel workflow-card" open>`) ||
+		!strings.Contains(body, `<details class="panel workflow-card">`) ||
+		!strings.Contains(body, "Existing templates") {
+		t.Fatalf("templates page is not using expandable workflow panels:\n%s", body)
 	}
 }
 

@@ -424,6 +424,100 @@ pre {
     max-width: none;
 }
 
+.workflow-card {
+    padding: 0;
+    overflow: hidden;
+    contain: layout;
+    transition: border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.workflow-card[open] {
+    border-color: #334256;
+    background: rgba(20, 27, 36, .9);
+    box-shadow: var(--shadow-soft);
+}
+
+.workflow-card summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.workflow-card summary::-webkit-details-marker {
+    display: none;
+}
+
+.workflow-card summary:hover {
+    background: rgba(255, 255, 255, .025);
+}
+
+.workflow-card summary:focus-visible {
+    outline: 3px solid var(--accent-soft);
+    outline-offset: -3px;
+}
+
+.workflow-heading {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.workflow-heading > span:last-child {
+    display: grid;
+    gap: 2px;
+}
+
+.workflow-heading strong {
+    font-size: 16px;
+}
+
+.workflow-heading small {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 450;
+}
+
+.workflow-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border: 1px solid #28544f;
+    border-radius: 9px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 19px;
+    font-weight: 750;
+}
+
+.disclosure-icon {
+    width: 9px;
+    height: 9px;
+    flex: 0 0 auto;
+    border-right: 2px solid var(--subtle);
+    border-bottom: 2px solid var(--subtle);
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform .16s ease, border-color .16s ease;
+}
+
+.workflow-card[open] .disclosure-icon {
+    border-color: var(--accent);
+    transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.workflow-form {
+    margin: 0 20px 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line-soft);
+}
+
 .templates-list {
     padding: 0;
     overflow: hidden;
