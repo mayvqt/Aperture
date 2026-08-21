@@ -259,7 +259,7 @@ pre {
     margin-top: 0;
 }
 
-.panel > p:last-child, .panel > form:last-child {
+.panel > p:last-child {
     margin-bottom: 0;
 }
 
@@ -414,7 +414,6 @@ pre {
     display: grid;
     gap: 16px;
     width: 100%;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
 }
 
