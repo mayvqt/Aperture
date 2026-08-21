@@ -20,6 +20,8 @@ coverage.out
 # Go workspace/cache files
 go.work
 go.work.sum
+/.gocache/
+/.tmp/
 
 # Logs and environment overrides
 *.log
