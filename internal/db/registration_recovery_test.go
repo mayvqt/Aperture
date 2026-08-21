@@ -149,6 +149,9 @@ func TestReconcileStaleRegistrationsReleasesOnlySafeReservations(t *testing.T) {
 		}
 		statuses[id] = status
 	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
 	if statuses[reservedID] != RegistrationAbandonedBeforeUser {
 		t.Fatalf("reserved status = %q", statuses[reservedID])
 	}
