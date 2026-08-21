@@ -520,6 +520,10 @@ pre {
     border-top: 1px solid var(--line-soft);
 }
 
+.workflow-body > :first-child {
+    margin-top: 0;
+}
+
 .templates-list > .page-head {
     margin: 0;
     padding: 20px 22px 14px;

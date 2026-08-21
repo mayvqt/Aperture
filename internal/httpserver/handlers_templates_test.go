@@ -80,6 +80,11 @@ func TestTemplateDetailShowsPreviewAndUpdatesTemplate(t *testing.T) {
 			t.Fatalf("body missing %q:\n%s", want, body)
 		}
 	}
+	if !strings.Contains(body, `<section class="template-workflows workflow-group">`) ||
+		!strings.Contains(body, `<details class="panel workflow-card" open>`) ||
+		!strings.Contains(body, "Policy details") {
+		t.Fatalf("template detail is missing expandable editor sections:\n%s", body)
+	}
 	for _, unwanted := range []string{"Configuration JSON", "Display preferences JSON", "Library access JSON"} {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("body should not show %q:\n%s", unwanted, body)

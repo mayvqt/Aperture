@@ -107,10 +107,13 @@
     </div>
 </div>{{if .Error}}
 <div class="notice error">{{.Error}}</div>{{end}}
-<section class="template-workflows">
-    <div class="panel">
-        <h2>Edit</h2>
-        <form action="/admin/templates/{{.Template.ID}}" method="post">
+<section class="template-workflows workflow-group">
+    <details class="panel workflow-card" open>
+        <summary>
+            <span class="workflow-heading"><span class="workflow-icon">&#9998;</span><span><strong>Edit template</strong><small>Update its name and permission policy</small></span></span>
+            <span class="disclosure-icon" aria-hidden="true"></span>
+        </summary>
+        <form action="/admin/templates/{{.Template.ID}}" method="post" class="workflow-body">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Name<input maxlength="80" name="name" required value="{{.Template.Name}}">
             </label>
@@ -121,8 +124,13 @@
             </label>
             <button>Save</button>
         </form>
-    </div>
-    <div class="panel">
+    </details>
+    <details class="panel workflow-card">
+        <summary>
+            <span class="workflow-heading"><span class="workflow-icon">&#123;&#125;</span><span><strong>Policy details</strong><small>Review the resolved access summary and JSON</small></span></span>
+            <span class="disclosure-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="workflow-body">
         <h2>Policy summary</h2>
         <div class="summary-list">{{range templateSummary .Template}}
             <div>
@@ -134,5 +142,6 @@
         <h2>Preview</h2>
         <h3>Policy</h3>
         <pre>{{.Template.PolicyJSON}}</pre>
-    </div>
+        </div>
+    </details>
 </section>{{template "base-end" .}}{{end}}
