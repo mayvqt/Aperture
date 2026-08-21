@@ -21,40 +21,36 @@ document.addEventListener("submit", function (event) {
     }
 });
 
-document.querySelectorAll(".workflow-card").forEach(function (card) {
-    var summary = card.querySelector("summary");
+var animatingWorkflows = new WeakSet();
+var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+document.addEventListener("click", function (event) {
+    var summary = event.target.closest(".workflow-card > summary");
     if (!summary) return;
 
-    summary.addEventListener("click", function (event) {
-        event.preventDefault();
-        if (card.dataset.animating === "true") return;
+    var card = summary.parentElement;
+    if (typeof card.animate !== "function" || reduceMotion.matches) return;
 
-        if (card.open) {
-            animateWorkflow(card, false);
-            return;
-        }
+    event.preventDefault();
+    if (animatingWorkflows.has(card)) return;
 
-        var group = card.closest(".template-workflows");
-        if (group) {
-            group.querySelectorAll(".workflow-card[open]").forEach(function (other) {
-                if (other !== card) animateWorkflow(other, false);
-            });
-        }
-        animateWorkflow(card, true);
-    });
+    var opening = !card.open;
+    if (opening) {
+        card.closest(".template-workflows").querySelectorAll(".workflow-card[open]").forEach(function (other) {
+            if (other !== card) animateWorkflow(other, false);
+        });
+    }
+    animateWorkflow(card, opening);
 });
 
 function animateWorkflow(card, opening) {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        card.open = opening;
-        return;
-    }
+    if (animatingWorkflows.has(card)) return;
 
     var startHeight = card.offsetHeight;
     if (opening) card.open = true;
     var endHeight = opening ? card.scrollHeight : card.querySelector("summary").offsetHeight;
 
-    card.dataset.animating = "true";
+    animatingWorkflows.add(card);
     card.style.overflow = "hidden";
     var animation = card.animate(
         {height: [startHeight + "px", endHeight + "px"]},
@@ -65,8 +61,6 @@ function animateWorkflow(card, opening) {
         card.open = opening;
         card.style.height = "";
         card.style.overflow = "";
-        delete card.dataset.animating;
+        animatingWorkflows.delete(card);
     };
-
-    animation.oncancel = animation.onfinish;
 }
