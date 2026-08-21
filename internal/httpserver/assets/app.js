@@ -36,9 +36,12 @@ document.addEventListener("click", function (event) {
 
     var opening = !card.open;
     if (opening) {
-        card.closest(".template-workflows").querySelectorAll(".workflow-card[open]").forEach(function (other) {
-            if (other !== card) animateWorkflow(other, false);
-        });
+        var group = card.closest(".workflow-group");
+        if (group) {
+            group.querySelectorAll(".workflow-card[open]").forEach(function (other) {
+                if (other !== card) animateWorkflow(other, false);
+            });
+        }
     }
     animateWorkflow(card, opening);
 });
