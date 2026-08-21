@@ -6,11 +6,27 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
 )
+
+func TestWebhooksPageUsesExpandableCreateForm(t *testing.T) {
+	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/webhooks", nil))
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d; body %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `<details class="panel workflow-card">`) || !strings.Contains(body, "Add webhook") {
+		t.Fatalf("webhooks page is missing expandable create form:\n%s", body)
+	}
+}
 
 func TestSendWebhookDiscordEmbed(t *testing.T) {
 	var payload discordPayload

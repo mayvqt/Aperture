@@ -1,7 +1,37 @@
 {{define "webhooks"}}{{template "base-start" .}}
-<div class="page-head"><div><p class="eyebrow">Notifications</p><h1>Webhooks</h1><p>Send selected operational events to Discord or a generic JSON endpoint.</p></div></div>
-<section class="settings-grid"><div class="panel"><h2>Add webhook</h2><form action="/admin/webhooks" method="post"><input name="csrf" type="hidden" value="{{.CSRF}}"><label>Name<input name="name" maxlength="100" required placeholder="Operations"></label><label>Type<select name="kind"><option value="discord">Discord</option><option value="generic">Generic JSON</option></select></label><label>Webhook URL<input name="url" type="url" autocomplete="off" required placeholder="https://discord.com/api/webhooks/…"><span class="hint">Stored encrypted and never shown again.</span></label><label>Discord role IDs<input name="role_ids" autocomplete="off" placeholder="123456789012345678"><span class="hint">Optional, comma-separated.</span></label><fieldset><legend>Events</legend>{{range .WebhookEvents}}<label class="check"><input name="event_{{.Value}}" type="checkbox"> {{.Label}}</label>{{end}}</fieldset><button>Add webhook</button></form></div>
-<div class="panel"><h2>Configured</h2>{{range .Webhooks}}<div class="webhook-card"><strong>{{.Name}}</strong><p class="hint">{{.Kind}} · {{.URL}}</p>{{if .RoleIDs}}<p class="hint">Roles: {{.RoleIDs}}</p>{{end}}<p class="webhook-events">{{.Events}}</p><div class="actions"><form action="/admin/webhooks/{{.ID}}/test" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="secondary small">Send test</button></form><form action="/admin/webhooks/{{.ID}}/delete" method="post" data-confirm="Delete this webhook?"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="danger small">Delete</button></form></div></div>{{else}}<p class="muted">No webhooks configured.</p>{{end}}</div></section>
+<div class="page-head">
+    <div><p class="eyebrow">Notifications</p><h1>Webhooks</h1><p>Send selected operational events to Discord or a generic JSON endpoint.</p></div>
+</div>
+<section class="stack workflow-group">
+    <details class="panel workflow-card">
+        <summary>
+            <span class="workflow-heading"><span class="workflow-icon">+</span><span><strong>Add webhook</strong><small>Connect Discord or a generic JSON endpoint</small></span></span>
+            <span class="disclosure-icon" aria-hidden="true"></span>
+        </summary>
+        <form action="/admin/webhooks" method="post" class="workflow-form">
+            <input name="csrf" type="hidden" value="{{.CSRF}}">
+            <label>Name<input name="name" maxlength="100" required placeholder="Operations"></label>
+            <label>Type<select name="kind"><option value="discord">Discord</option><option value="generic">Generic JSON</option></select></label>
+            <label>Webhook URL<input name="url" type="url" autocomplete="off" required placeholder="https://discord.com/api/webhooks/..."><span class="hint">Stored encrypted and never shown again.</span></label>
+            <label>Discord role IDs<input name="role_ids" autocomplete="off" placeholder="123456789012345678"><span class="hint">Optional, comma-separated.</span></label>
+            <fieldset><legend>Events</legend>{{range .WebhookEvents}}<label class="check"><input name="event_{{.Value}}" type="checkbox"> {{.Label}}</label>{{end}}</fieldset>
+            <button>Add webhook</button>
+        </form>
+    </details>
+    <div class="panel">
+        <h2>Configured</h2>
+        {{range .Webhooks}}<div class="webhook-card">
+            <strong>{{.Name}}</strong>
+            <p class="hint">{{.Kind}} &middot; {{.URL}}</p>
+            {{if .RoleIDs}}<p class="hint">Roles: {{.RoleIDs}}</p>{{end}}
+            <p class="webhook-events">{{.Events}}</p>
+            <div class="actions">
+                <form action="/admin/webhooks/{{.ID}}/test" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="secondary small">Send test</button></form>
+                <form action="/admin/webhooks/{{.ID}}/delete" method="post" data-confirm="Delete this webhook?"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="danger small">Delete</button></form>
+            </div>
+        </div>{{else}}<p class="muted">No webhooks configured.</p>{{end}}
+    </div>
+</section>
 {{template "base-end" .}}{{end}}
 
 {{define "audit"}}{{template "base-start" .}}
@@ -14,8 +44,8 @@
         <td><time datetime="{{.CreatedAt}}">{{dateTime .CreatedAt}}</time></td>
         <td><strong>{{auditAction .Action}}</strong></td>
         <td>{{if .ActorUserID}}<span title="{{.ActorUserID}}">{{shortID .ActorUserID}}</span>{{else}}Public{{end}}</td>
-        <td>{{if .TargetType}}{{.TargetType}} {{.TargetID}}{{else}}—{{end}}</td>
-        <td>{{if .IPAddress}}<code>{{.IPAddress}}</code>{{else}}—{{end}}</td>
+        <td>{{if .TargetType}}{{.TargetType}} {{.TargetID}}{{else}}&mdash;{{end}}</td>
+        <td>{{if .IPAddress}}<code>{{.IPAddress}}</code>{{else}}&mdash;{{end}}</td>
         <td>{{if hasMetadata .MetadataJSON}}<details class="audit-details"><summary>Details</summary><pre>{{prettyJSON .MetadataJSON}}</pre></details>{{end}}</td>
     </tr>{{else}}<tr><td colspan="6">No audit events yet.</td></tr>{{end}}</tbody>
 </table></div>
