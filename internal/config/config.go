@@ -93,6 +93,9 @@ func Load(args []string) (Config, error) {
 		cfg.DBPath = filepath.Join(cfg.ConfigDir, "aperture.db")
 	}
 	cfg.PublicURL = strings.TrimRight(strings.TrimSpace(cfg.PublicURL), "/")
+	if !cfg.CookieManaged {
+		cfg.CookieSecure = strings.HasPrefix(cfg.PublicURL, "https://")
+	}
 	if cfg.PublicURL != "" {
 		u, err := url.Parse(cfg.PublicURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {

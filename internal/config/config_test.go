@@ -195,6 +195,16 @@ func TestLoadTrimsPublicURL(t *testing.T) {
 	}
 }
 
+func TestLoadDerivesSecureCookiesFromFlagPublicURL(t *testing.T) {
+	cfg, err := Load([]string{"--public-url", "https://aperture.example"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.CookieSecure {
+		t.Fatal("CookieSecure = false, want true for an HTTPS public URL")
+	}
+}
+
 func TestLoadRejectsInvalidSecurityConfiguration(t *testing.T) {
 	t.Setenv("APERTURE_PUBLIC_URL", "https://aperture.example")
 	t.Setenv("APERTURE_ENCRYPTION_KEY", testSecret)
