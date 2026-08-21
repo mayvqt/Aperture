@@ -412,6 +412,52 @@ pre {
 
 .template-workflows {
     width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+}
+
+.template-workflows .panel {
+    min-width: 0;
+}
+
+.template-workflows form {
+    max-width: none;
+}
+
+.templates-list {
+    padding: 0;
+    overflow: hidden;
+}
+
+.templates-list > .page-head {
+    margin: 0;
+    padding: 20px 22px 14px;
+}
+
+.templates-list .table-wrap {
+    border-width: 1px 0 0;
+    border-radius: 0;
+}
+
+.templates-list th,
+.templates-list td {
+    vertical-align: middle;
+}
+
+.templates-list th:first-child {
+    width: 14%;
+}
+
+.templates-list th:nth-child(2) {
+    width: 22%;
+}
+
+.templates-list th:last-child {
+    width: 25%;
+}
+
+.templates-list .row-actions {
+    flex-wrap: nowrap;
 }
 
 .table-wrap {

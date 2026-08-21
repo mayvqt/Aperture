@@ -12,7 +12,7 @@
         flex-direction: column;
     }
 
-    .grid, .grid.four, .split, .public-wrap, .settings-grid, .form-grid {
+    .grid, .grid.four, .split, .public-wrap, .settings-grid, .form-grid, .template-workflows {
         grid-template-columns: 1fr;
     }
 
