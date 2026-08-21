@@ -18,6 +18,7 @@ type templateSummaryItem struct {
 }
 
 var templateFuncs = template.FuncMap{
+	"stylesheetHash": func() string { return stylesheetHash },
 	"boolText": func(v bool) string {
 		if v {
 			return "yes"

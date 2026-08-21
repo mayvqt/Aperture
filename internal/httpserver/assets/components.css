@@ -411,7 +411,7 @@ pre {
 }
 
 .template-workflows {
-    max-width: 860px;
+    width: 100%;
 }
 
 .table-wrap {
