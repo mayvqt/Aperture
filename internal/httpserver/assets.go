@@ -26,6 +26,7 @@ var stylesheetFiles = []string{
 	"assets/components.css",
 	"assets/pages.css",
 	"assets/responsive.css",
+	"assets/aperture.css",
 }
 
 func bundleStylesheets() []byte {

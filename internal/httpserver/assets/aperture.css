@@ -1,0 +1,377 @@
+/*
+ * Aperture visual system
+ * Identity and account operations console.
+ */
+
+:root {
+    --bg: #0d0d12;
+    --bg-soft: #121219;
+    --panel: #181820;
+    --panel-2: #20202a;
+    --panel-3: #14141b;
+    --line: rgba(239, 234, 223, .16);
+    --line-soft: rgba(239, 234, 223, .09);
+    --ink: #f4f0e8;
+    --muted: #aaa6b3;
+    --subtle: #777481;
+    --faint: #25242e;
+    --accent: #ff8a72;
+    --accent-ink: #27100b;
+    --accent-soft: rgba(255, 138, 114, .13);
+    --danger: #ff8ca1;
+    --danger-ink: #280a11;
+    --danger-soft: rgba(255, 140, 161, .12);
+    --warn: #f0c878;
+    --warn-soft: rgba(240, 200, 120, .12);
+    --good: #91d6b4;
+    --good-soft: rgba(145, 214, 180, .12);
+    --shadow: 0 30px 80px rgba(0, 0, 0, .4);
+    --shadow-soft: 0 14px 36px rgba(0, 0, 0, .22);
+    --radius: 18px;
+    --radius-small: 11px;
+}
+
+body {
+    background:
+        radial-gradient(circle at 85% -10%, rgba(255, 138, 114, .13), transparent 30rem),
+        radial-gradient(circle at 20% 100%, rgba(145, 214, 180, .07), transparent 34rem),
+        var(--bg);
+}
+
+header {
+    border: 1px solid var(--line-soft);
+    border-radius: 22px;
+    background: rgba(24, 24, 32, .86);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(18px);
+}
+
+.brand {
+    font-size: 18px;
+    letter-spacing: -.03em;
+}
+
+.brand::before,
+.auth-brand::before {
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--accent), #ffc68d);
+    box-shadow: 0 0 20px rgba(255, 138, 114, .48);
+    transform: rotate(45deg);
+}
+
+nav {
+    gap: 4px;
+}
+
+nav a,
+nav button {
+    min-height: 40px;
+    border-radius: 9px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+nav a:hover,
+nav button:hover {
+    background: var(--accent-soft);
+    border-color: transparent;
+}
+
+main {
+    max-width: 1320px;
+    padding-top: 44px;
+}
+
+h1 {
+    font-size: clamp(36px, 5vw, 58px);
+    letter-spacing: -.055em;
+    line-height: .98;
+}
+
+h2 {
+    letter-spacing: -.025em;
+}
+
+.page-head {
+    align-items: flex-end;
+    margin-bottom: 28px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.page-head > div > p:not(.eyebrow) {
+    max-width: 54ch;
+}
+
+.eyebrow {
+    margin-bottom: 8px;
+    color: var(--accent);
+    font-size: 11px;
+    letter-spacing: .12em;
+}
+
+.panel,
+.notice,
+.invite-card,
+.stats-grid,
+.table-wrap {
+    border-color: var(--line-soft);
+    border-radius: var(--radius);
+    background: rgba(24, 24, 32, .82);
+    box-shadow: var(--shadow-soft);
+}
+
+.panel {
+    padding: 24px;
+}
+
+.stats-grid {
+    border: 0;
+    gap: 1px;
+    background: var(--line-soft);
+}
+
+.metric {
+    min-height: 118px;
+    border: 0;
+    padding: 22px;
+    background: var(--panel);
+}
+
+.metric strong {
+    font-size: 38px;
+    letter-spacing: -.055em;
+}
+
+.metric span {
+    color: var(--subtle);
+    font-size: 11px;
+    letter-spacing: .08em;
+}
+
+table,
+th {
+    background: transparent;
+}
+
+th {
+    color: var(--subtle);
+    letter-spacing: .09em;
+}
+
+th,
+td {
+    padding-block: 15px;
+}
+
+tbody tr {
+    transition: background .14s ease;
+}
+
+tbody tr:hover {
+    background: rgba(255, 138, 114, .045);
+}
+
+.status {
+    min-height: 26px;
+    border: 1px solid currentcolor;
+    padding-inline: 10px;
+}
+
+button,
+.button {
+    border-color: var(--accent);
+    border-radius: 10px;
+    padding: 10px 15px;
+    box-shadow: 0 10px 24px rgba(255, 138, 114, .12);
+}
+
+.secondary {
+    border-color: var(--line);
+    background: rgba(255, 255, 255, .035);
+}
+
+.secondary:hover {
+    background: var(--accent-soft);
+}
+
+input,
+textarea,
+select {
+    min-height: 44px;
+    border-color: var(--line);
+    border-radius: 10px;
+    background: #101016;
+}
+
+input:hover,
+textarea:hover,
+select:hover {
+    border-color: rgba(255, 138, 114, .35);
+    background: #121219;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--accent);
+    outline-color: var(--accent-soft);
+}
+
+.workflow-card,
+.invite-card {
+    transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.workflow-card:hover,
+.invite-card:hover {
+    border-color: rgba(255, 138, 114, .28);
+    transform: translateY(-2px);
+}
+
+.workflow-icon {
+    border-color: rgba(255, 138, 114, .3);
+    background: var(--accent-soft);
+}
+
+.auth-page {
+    position: relative;
+}
+
+.auth-page::before {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 6px;
+    background: linear-gradient(180deg, var(--accent), #ffc68d 55%, var(--good));
+    content: "";
+}
+
+.auth-wrap,
+.join-wrap {
+    width: min(100%, 520px);
+}
+
+.auth-wrap .panel,
+.join-card {
+    border-radius: 24px;
+    padding: clamp(26px, 5vw, 42px);
+    background: rgba(24, 24, 32, .9);
+}
+
+.auth-page h1 {
+    font-size: clamp(38px, 8vw, 58px);
+}
+
+.auth-page form {
+    gap: 18px;
+}
+
+@media (min-width: 1080px) {
+    body:not(.auth-shell) {
+        display: grid;
+        grid-template-columns: 230px minmax(0, 1fr);
+        gap: 28px;
+        padding: 18px;
+    }
+
+    body:not(.auth-shell) header {
+        position: sticky;
+        top: 18px;
+        display: flex;
+        align-items: stretch;
+        flex-direction: column;
+        min-height: calc(100vh - 36px);
+        padding: 24px 16px;
+    }
+
+    body:not(.auth-shell) header .brand {
+        margin: 0 8px 34px;
+    }
+
+    body:not(.auth-shell) nav {
+        align-items: stretch;
+        flex-direction: column;
+        flex: 1;
+    }
+
+    body:not(.auth-shell) nav a,
+    body:not(.auth-shell) nav button {
+        width: 100%;
+        text-align: left;
+    }
+
+    body:not(.auth-shell) .logout-form {
+        margin-top: auto;
+    }
+
+    body:not(.auth-shell) main {
+        width: 100%;
+        min-width: 0;
+        margin: 0;
+        padding: 36px 18px 72px 0;
+    }
+
+    .dashboard-preview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1079px) {
+    header {
+        position: static;
+        margin: 12px;
+    }
+
+    nav {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    nav a,
+    nav button {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 620px) {
+    header {
+        gap: 10px;
+        margin: 8px;
+        padding: 12px;
+    }
+
+    main {
+        padding: 24px 12px 52px;
+    }
+
+    h1 {
+        font-size: 36px;
+    }
+
+    .page-head {
+        gap: 14px;
+        margin-bottom: 20px;
+        padding-bottom: 18px;
+    }
+
+    .panel {
+        padding: 18px;
+    }
+
+    .metric {
+        min-height: auto;
+        padding: 18px;
+    }
+
+    .auth-page {
+        padding: 22px 16px;
+    }
+}
