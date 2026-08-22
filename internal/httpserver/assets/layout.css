@@ -5,7 +5,7 @@ header {
     justify-content: space-between;
     align-items: center;
     gap: 16px;
-    background: rgba(8, 12, 18, .86);
+    background: var(--panel-glass-strong);
     position: sticky;
     top: 0;
     z-index: 5;
@@ -40,7 +40,7 @@ nav a, nav button {
 
 nav a:hover, nav button:hover {
     color: var(--ink);
-    background: rgba(255, 255, 255, .04);
+    background: var(--surface-subtle);
     border-color: var(--line-soft);
 }
 

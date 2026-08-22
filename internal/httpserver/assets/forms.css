@@ -8,7 +8,7 @@ label {
     display: grid;
     gap: 7px;
     font-weight: 650;
-    color: #eaf0f8;
+    color: var(--ink);
 }
 
 label:has(.hint) {
@@ -52,19 +52,19 @@ input, textarea, select {
     border-radius: 7px;
     padding: 10px 12px;
     font: inherit;
-    background: #0b1119;
+    background: var(--field);
     color: var(--ink);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .02);
     transition: border-color .14s ease, box-shadow .14s ease, background .14s ease;
 }
 
 input::placeholder, textarea::placeholder {
-    color: #647286;
+    color: var(--subtle);
 }
 
 input:hover, textarea:hover, select:hover {
-    border-color: #3a485b;
-    background: #0d141e;
+    border-color: var(--accent-border);
+    background: var(--bg-soft);
 }
 
 input:focus, textarea:focus, select:focus {
@@ -79,7 +79,7 @@ textarea {
 
 button, .button {
     width: max-content;
-    border: 1px solid rgba(94, 234, 212, .92);
+    border: 1px solid var(--accent);
     background: var(--accent);
     color: var(--accent-ink);
     border-radius: 7px;

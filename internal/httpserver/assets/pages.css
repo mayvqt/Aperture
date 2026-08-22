@@ -2,9 +2,7 @@ body.auth-shell {
     min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
-    background: radial-gradient(circle at 50% -8rem, rgba(94, 234, 212, .14), transparent 26rem),
-    radial-gradient(circle at 100% 100%, rgba(251, 191, 36, .05), transparent 24rem),
-    var(--bg);
+    background: var(--bg);
 }
 
 .auth-page {
@@ -26,7 +24,7 @@ body.auth-shell {
 
 .auth-wrap .panel, .join-card {
     padding: 30px;
-    border-color: #334256;
+    border-color: var(--line);
     box-shadow: var(--shadow);
 }
 
@@ -71,9 +69,9 @@ body.auth-shell {
 }
 
 .public-side {
-    background: linear-gradient(145deg, #102d2b, #151b24 62%, #0b1117);
-    color: #fff;
-    border: 1px solid #254154;
+    background: var(--panel-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
     border-radius: 8px;
     padding: 26px;
     min-height: 420px;
@@ -84,7 +82,7 @@ body.auth-shell {
 }
 
 .public-side p, .public-side .hint {
-    color: #b9d5df;
+    color: var(--muted);
 }
 
 .public-card {
@@ -106,7 +104,7 @@ body.auth-shell {
 .check-list li {
     display: flex;
     gap: 8px;
-    color: #e8f7fb;
+    color: var(--ink);
 }
 
 .check-list li::before {

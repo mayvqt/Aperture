@@ -34,8 +34,9 @@
 <section class="auth-wrap">
     <div class="auth-brand">Aperture</div>
     <div class="panel">
-        <p class="eyebrow">{{.ServerName}} administrator</p>
-        <h1>Sign in</h1>{{if .Error}}
+        <p class="eyebrow">Administrator access</p>
+        <h1>Sign in</h1>
+        <p class="auth-intro">Use your {{.ServerName}} administrator account.</p>{{if .Error}}
         <div class="notice error">{{.Error}}</div>
         {{end}}
         <form action="/login" method="post">

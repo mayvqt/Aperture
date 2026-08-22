@@ -3,45 +3,9 @@
  * Identity and account operations console.
  */
 
-:root {
-    --bg: #0d0d12;
-    --bg-soft: #121219;
-    --panel: #181820;
-    --panel-2: #20202a;
-    --panel-3: #14141b;
-    --line: rgba(239, 234, 223, .16);
-    --line-soft: rgba(239, 234, 223, .09);
-    --ink: #f4f0e8;
-    --muted: #aaa6b3;
-    --subtle: #777481;
-    --faint: #25242e;
-    --accent: #ff8a72;
-    --accent-ink: #27100b;
-    --accent-soft: rgba(255, 138, 114, .13);
-    --danger: #ff8ca1;
-    --danger-ink: #280a11;
-    --danger-soft: rgba(255, 140, 161, .12);
-    --warn: #f0c878;
-    --warn-soft: rgba(240, 200, 120, .12);
-    --good: #91d6b4;
-    --good-soft: rgba(145, 214, 180, .12);
-    --shadow: 0 30px 80px rgba(0, 0, 0, .4);
-    --shadow-soft: 0 14px 36px rgba(0, 0, 0, .22);
-    --radius: 18px;
-    --radius-small: 11px;
-}
-
-body {
-    background:
-        radial-gradient(circle at 85% -10%, rgba(255, 138, 114, .13), transparent 30rem),
-        radial-gradient(circle at 20% 100%, rgba(145, 214, 180, .07), transparent 34rem),
-        var(--bg);
-}
-
 header {
     border: 1px solid var(--line-soft);
     border-radius: 22px;
-    background: rgba(24, 24, 32, .86);
     box-shadow: var(--shadow-soft);
     backdrop-filter: blur(18px);
 }
@@ -49,14 +13,6 @@ header {
 .brand {
     font-size: 18px;
     letter-spacing: -.03em;
-}
-
-.brand::before,
-.auth-brand::before {
-    border-radius: 3px;
-    background: linear-gradient(135deg, var(--accent), #ffc68d);
-    box-shadow: 0 0 20px rgba(255, 138, 114, .48);
-    transform: rotate(45deg);
 }
 
 nav {
@@ -118,7 +74,7 @@ h2 {
 .table-wrap {
     border-color: var(--line-soft);
     border-radius: var(--radius);
-    background: rgba(24, 24, 32, .82);
+    background: var(--panel-glass);
     box-shadow: var(--shadow-soft);
 }
 
@@ -170,7 +126,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-    background: rgba(255, 138, 114, .045);
+    background: var(--surface-hover);
 }
 
 .status {
@@ -181,15 +137,14 @@ tbody tr:hover {
 
 button,
 .button {
-    border-color: var(--accent);
     border-radius: 10px;
     padding: 10px 15px;
-    box-shadow: 0 10px 24px rgba(255, 138, 114, .12);
+    box-shadow: 0 10px 24px var(--accent-soft);
 }
 
 .secondary {
     border-color: var(--line);
-    background: rgba(255, 255, 255, .035);
+    background: var(--surface-subtle);
 }
 
 .secondary:hover {
@@ -200,23 +155,7 @@ input,
 textarea,
 select {
     min-height: 44px;
-    border-color: var(--line);
     border-radius: 10px;
-    background: #101016;
-}
-
-input:hover,
-textarea:hover,
-select:hover {
-    border-color: rgba(255, 138, 114, .35);
-    background: #121219;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-    border-color: var(--accent);
-    outline-color: var(--accent-soft);
 }
 
 .workflow-card,
@@ -226,25 +165,8 @@ select:focus {
 
 .workflow-card:hover,
 .invite-card:hover {
-    border-color: rgba(255, 138, 114, .28);
+    border-color: var(--accent-border);
     transform: translateY(-2px);
-}
-
-.workflow-icon {
-    border-color: rgba(255, 138, 114, .3);
-    background: var(--accent-soft);
-}
-
-.auth-page {
-    position: relative;
-}
-
-.auth-page::before {
-    position: fixed;
-    inset: 0 auto 0 0;
-    width: 6px;
-    background: linear-gradient(180deg, var(--accent), #ffc68d 55%, var(--good));
-    content: "";
 }
 
 .auth-wrap,
@@ -256,7 +178,7 @@ select:focus {
 .join-card {
     border-radius: 24px;
     padding: clamp(26px, 5vw, 42px);
-    background: rgba(24, 24, 32, .9);
+    background: var(--panel-glass-strong);
 }
 
 .auth-page h1 {
@@ -265,6 +187,10 @@ select:focus {
 
 .auth-page form {
     gap: 18px;
+}
+
+.auth-intro {
+    margin: -2px 0 22px;
 }
 
 @media (min-width: 1080px) {
