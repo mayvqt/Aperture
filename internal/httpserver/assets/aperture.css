@@ -15,14 +15,6 @@ header {
     letter-spacing: -.03em;
 }
 
-.brand::before,
-.auth-brand::before {
-    border-radius: 3px;
-    background: var(--accent);
-    box-shadow: 0 0 20px var(--accent-glow);
-    transform: rotate(45deg);
-}
-
 nav {
     gap: 4px;
 }
@@ -195,6 +187,10 @@ select {
 
 .auth-page form {
     gap: 18px;
+}
+
+.auth-intro {
+    margin: -2px 0 22px;
 }
 
 @media (min-width: 1080px) {

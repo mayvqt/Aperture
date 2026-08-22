@@ -45,14 +45,13 @@ tbody tr:hover {
 
 .brand::before, .auth-brand::before {
     content: "";
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 18px var(--accent-glow);
+    background: url("/assets/aperture-mark.svg") center / contain no-repeat;
+    filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
 .brand::before {
-    width: 10px;
-    height: 10px;
+    width: 20px;
+    height: 20px;
 }
 
 .auth-brand {
@@ -61,9 +60,8 @@ tbody tr:hover {
 }
 
 .auth-brand::before {
-    width: 12px;
-    height: 12px;
-    box-shadow: 0 0 22px var(--accent-glow);
+    width: 24px;
+    height: 24px;
 }
 
 .hint, .muted {
