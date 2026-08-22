@@ -24,11 +24,11 @@ th {
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: .05em;
-    background: #101720;
+    background: var(--panel-3);
 }
 
 tbody tr:hover {
-    background: rgba(255, 255, 255, .018);
+    background: var(--surface-hover);
 }
 
 .brand, .auth-brand {
@@ -47,7 +47,7 @@ tbody tr:hover {
     content: "";
     border-radius: 50%;
     background: var(--accent);
-    box-shadow: 0 0 18px rgba(94, 234, 212, .7);
+    box-shadow: 0 0 18px var(--accent-glow);
 }
 
 .brand::before {
@@ -63,7 +63,7 @@ tbody tr:hover {
 .auth-brand::before {
     width: 12px;
     height: 12px;
-    box-shadow: 0 0 22px rgba(94, 234, 212, .65);
+    box-shadow: 0 0 22px var(--accent-glow);
 }
 
 .hint, .muted {
@@ -82,7 +82,7 @@ tbody tr:hover {
 }
 
 .secondary:hover {
-    background: #202b3a;
+    background: var(--accent-soft);
 }
 
 .danger {
@@ -92,7 +92,7 @@ tbody tr:hover {
 }
 
 .danger:hover {
-    background: #ff8194;
+    filter: brightness(1.06);
 }
 
 .notice {
@@ -105,9 +105,9 @@ tbody tr:hover {
 }
 
 .error {
-    border-color: #7a2c2c;
+    border-color: var(--danger-border);
     background: var(--danger-soft);
-    color: #fecaca;
+    color: var(--danger);
 }
 
 .health-list {
@@ -129,13 +129,13 @@ tbody tr:hover {
 }
 
 .health.warn {
-    border-color: #5f4713;
-    background: linear-gradient(180deg, var(--warn-soft), #18150d);
+    border-color: var(--warn-border);
+    background: var(--warn-soft);
 }
 
 .health.bad {
-    border-color: #743041;
-    background: linear-gradient(180deg, var(--danger-soft), #1a1014);
+    border-color: var(--danger-border);
+    background: var(--danger-soft);
 }
 
 .actions {
@@ -180,7 +180,7 @@ tbody tr:hover {
 }
 
 .logout-form button:hover {
-    background: rgba(255, 255, 255, .04);
+    background: var(--surface-subtle);
     border-color: var(--line-soft);
     color: var(--ink);
     filter: none;
@@ -210,7 +210,7 @@ pre {
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    background: #0f1722;
+    background: var(--field);
     border: 1px solid var(--line);
     border-radius: 7px;
     padding: 12px;
@@ -249,7 +249,7 @@ pre {
 }
 
 .panel {
-    background: rgba(20, 27, 36, .72);
+    background: var(--panel-glass);
     border: 1px solid var(--line-soft);
     border-radius: 10px;
     padding: 22px;
@@ -281,7 +281,7 @@ pre {
     gap: 0;
     border: 1px solid var(--line-soft);
     border-radius: 10px;
-    background: rgba(20, 27, 36, .56);
+    background: var(--panel-glass);
     overflow: hidden;
 }
 
@@ -342,7 +342,7 @@ pre {
     padding: 18px;
     border: 1px dashed var(--line);
     border-radius: 8px;
-    background: rgba(18, 26, 36, .5);
+    background: var(--panel-3);
 }
 
 .status {
@@ -373,9 +373,9 @@ pre {
 .invite-url {
     display: block;
     padding: 12px;
-    background: #080d14;
-    color: #d8fff9;
-    border-color: #1f3f46;
+    background: var(--field);
+    color: var(--ink);
+    border-color: var(--line);
     border-radius: 7px;
     min-width: 0;
 }
@@ -433,8 +433,8 @@ pre {
 }
 
 .workflow-card[open] {
-    border-color: #334256;
-    background: rgba(20, 27, 36, .9);
+    border-color: var(--accent-border);
+    background: var(--panel-glass-strong);
     box-shadow: var(--shadow-soft);
 }
 
@@ -454,7 +454,7 @@ pre {
 }
 
 .workflow-card summary:hover {
-    background: rgba(255, 255, 255, .025);
+    background: var(--surface-hover);
 }
 
 .workflow-card summary:focus-visible {
@@ -490,7 +490,7 @@ pre {
     width: 34px;
     height: 34px;
     flex: 0 0 auto;
-    border: 1px solid #28544f;
+    border: 1px solid var(--accent-border);
     border-radius: 9px;
     background: var(--accent-soft);
     color: var(--accent);
@@ -630,7 +630,7 @@ pre {
     padding: 16px;
     border: 1px solid var(--line-soft);
     border-radius: 10px;
-    background: rgba(20, 27, 36, .68);
+    background: var(--panel-glass);
 }
 
 .invite-card-head {
@@ -686,7 +686,7 @@ pre {
 .summary-pills span {
     border: 1px solid var(--line-soft);
     border-radius: 999px;
-    background: #0e151e;
+    background: var(--panel-3);
     color: var(--muted);
     font-size: 12px;
     padding: 4px 8px;
@@ -708,7 +708,7 @@ pre {
 .summary-list div {
     border: 1px solid var(--line-soft);
     border-radius: 8px;
-    background: #0e151e;
+    background: var(--panel-3);
     padding: 12px;
 }
 
