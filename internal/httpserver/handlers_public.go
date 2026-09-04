@@ -33,7 +33,7 @@ func (s *Server) publicInvite(w http.ResponseWriter, r *http.Request) {
 		s.error(w, err)
 		return
 	}
-	render(w, "public-invite", viewData{Token: token, CSRF: csrf, Invite: invite})
+	render(w, "public-invite", viewData{AuthTitle: "Create account · Aperture", Token: token, CSRF: csrf, Invite: invite})
 }
 func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
@@ -63,7 +63,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 			s.error(w, err)
 			return
 		}
-		render(w, "public-invite", viewData{Token: token, CSRF: csrf, Invite: invite, FormUsername: username, Error: validationError})
+		render(w, "public-invite", viewData{AuthTitle: "Create account · Aperture", Token: token, CSRF: csrf, Invite: invite, FormUsername: username, Error: validationError})
 		return
 	}
 	settings, err := s.settings(r.Context())
@@ -139,5 +139,5 @@ func (s *Server) success(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/guide", http.StatusSeeOther)
 }
 func (s *Server) guide(w http.ResponseWriter, _ *http.Request) {
-	render(w, "guide", viewData{})
+	render(w, "guide", viewData{AuthTitle: "Account created · Aperture"})
 }

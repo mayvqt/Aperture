@@ -1,16 +1,48 @@
 document.addEventListener("click", function (event) {
     var button = event.target.closest("[data-copy]");
-    if (!button || !navigator.clipboard) return;
+    if (!button) return;
+
+    var status = document.getElementById(button.getAttribute("aria-describedby"));
+    function report(message) {
+        if (status) status.textContent = message;
+    }
+
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        report("Copy is unavailable. Select the URL and copy it manually.");
+        return;
+    }
 
     var target = document.getElementById(button.getAttribute("data-copy"));
-    if (!target) return;
+    if (!target) {
+        report("Could not find the invite URL. Select and copy it manually.");
+        return;
+    }
 
     navigator.clipboard.writeText(target.textContent.trim()).then(function () {
         var old = button.textContent;
         button.textContent = "Copied";
+        report("Invite URL copied.");
         window.setTimeout(function () {
             button.textContent = old;
         }, 1600);
+    }, function () {
+        report("Copy failed. Select the URL and copy it manually.");
+    });
+});
+
+function syncCustomExpiry(select) {
+    var field = document.getElementById(select.getAttribute("aria-controls"));
+    if (!field) return;
+    var input = field.querySelector("input[name=expires_at]");
+    var custom = select.value === "custom";
+    field.hidden = !custom;
+    if (input) input.disabled = !custom;
+}
+
+document.querySelectorAll("select[name=expires_after_days][aria-controls]").forEach(function (select) {
+    syncCustomExpiry(select);
+    select.addEventListener("change", function () {
+        syncCustomExpiry(select);
     });
 });
 
@@ -20,6 +52,19 @@ document.addEventListener("submit", function (event) {
         event.preventDefault();
     }
 });
+
+var adminNav = document.querySelector("nav.admin-nav");
+if (adminNav) {
+    var currentNavItem = adminNav.querySelector('a[aria-current="page"]');
+    var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (currentNavItem && adminNav.scrollWidth > adminNav.clientWidth) {
+        currentNavItem.scrollIntoView({
+            block: "nearest",
+            inline: "nearest",
+            behavior: reducedMotion.matches ? "auto" : "smooth"
+        });
+    }
+}
 
 var animatingWorkflows = new WeakSet();
 var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");

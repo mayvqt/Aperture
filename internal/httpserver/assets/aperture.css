@@ -34,6 +34,12 @@ nav button:hover {
     border-color: transparent;
 }
 
+nav a[aria-current="page"] {
+    color: var(--ink);
+    background: var(--accent-soft);
+    border-color: var(--line-soft);
+}
+
 main {
     max-width: 1320px;
     padding-top: 44px;
@@ -158,15 +164,43 @@ select {
     border-radius: 10px;
 }
 
-.workflow-card,
-.invite-card {
+.workflow-card {
     transition: transform .16s ease, border-color .16s ease, background .16s ease;
+}
+
+.invite-card {
+    transition: border-color .16s ease, background .16s ease;
 }
 
 .workflow-card:hover,
 .invite-card:hover {
     border-color: var(--accent-border);
+}
+
+.workflow-card:hover {
     transform: translateY(-2px);
+}
+
+.copy-status {
+    grid-column: 1 / -1;
+    min-height: 1.25em;
+    color: var(--subtle);
+    font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .workflow-card:hover,
+    button:hover,
+    .button:hover {
+        transform: none !important;
+    }
 }
 
 .auth-wrap,
@@ -253,11 +287,6 @@ select {
         width: 100%;
         flex-wrap: nowrap;
         overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    nav::-webkit-scrollbar {
-        display: none;
     }
 
     nav a,
@@ -283,6 +312,7 @@ select {
     }
 
     .page-head {
+        align-items: stretch;
         gap: 14px;
         margin-bottom: 20px;
         padding-bottom: 18px;

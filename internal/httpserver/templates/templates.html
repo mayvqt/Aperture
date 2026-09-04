@@ -70,7 +70,7 @@
                         <input name="csrf" type="hidden" value="{{$.CSRF}}">
                         <button class="secondary small">Set default</button>
                     </form>
-                    <form action="/admin/templates/{{.ID}}/delete" method="post">
+                    <form action="/admin/templates/{{.ID}}/delete" data-confirm="Delete this template? This cannot be undone." method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}">
                         <button class="danger small">Delete</button>
                     </form>
@@ -99,7 +99,7 @@
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <button class="secondary">Set default</button>
         </form>
-        <form action="/admin/templates/{{.Template.ID}}/delete" method="post">
+        <form action="/admin/templates/{{.Template.ID}}/delete" data-confirm="Delete this template? This cannot be undone." method="post">
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <button class="danger">Delete</button>
         </form>

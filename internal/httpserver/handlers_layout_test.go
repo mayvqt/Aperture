@@ -19,8 +19,11 @@ func TestAdminNavShowsDashboardWithoutBrandIcon(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, `<a href="/admin">Dashboard</a>`) {
+	if !strings.Contains(body, `<a href="/admin"`) || !strings.Contains(body, `>Dashboard</a>`) {
 		t.Fatalf("body missing dashboard nav:\n%s", body)
+	}
+	if !strings.Contains(body, `<title>Dashboard · Aperture</title>`) || !strings.Contains(body, `<a href="/admin" aria-current="page">Dashboard</a>`) {
+		t.Fatalf("body missing page title or current navigation state:\n%s", body)
 	}
 	if strings.Contains(body, "brand-mark") {
 		t.Fatalf("body still contains global A icon markup:\n%s", body)
@@ -49,6 +52,29 @@ func TestAuthPagesUseFullViewportShell(t *testing.T) {
 	body := rr.Body.String()
 	if !strings.Contains(body, `<body class="auth-shell">`) || !strings.Contains(body, `<main class="auth-page">`) {
 		t.Fatalf("auth page missing full viewport shell:\n%s", body)
+	}
+	if !strings.Contains(body, `<title>Sign in · Aperture</title>`) {
+		t.Fatalf("login page missing descriptive document title:\n%s", body)
+	}
+}
+
+func TestAuthTitlesAndAdminNavScript(t *testing.T) {
+	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	req := httptest.NewRequest(http.MethodGet, "/guide", nil)
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	if !strings.Contains(rr.Body.String(), `<title>Account created · Aperture</title>`) {
+		t.Fatalf("guide page missing descriptive document title:\n%s", rr.Body.String())
+	}
+
+	assetReq := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	assetRR := httptest.NewRecorder()
+	handler.ServeHTTP(assetRR, assetReq)
+	asset := assetRR.Body.String()
+	for _, want := range []string{`nav.admin-nav`, `a[aria-current="page"]`, `scrollIntoView`, `prefers-reduced-motion`} {
+		if !strings.Contains(asset, want) {
+			t.Fatalf("app.js missing %q:\n%s", want, asset)
+		}
 	}
 }
 

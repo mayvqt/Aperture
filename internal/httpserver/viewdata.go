@@ -9,6 +9,8 @@ type viewData struct {
 	Error            string
 	Message          string
 	Title            string
+	AuthTitle        string
+	CurrentPage      string
 	ServerName       string
 	Provider         string
 	ServerURL        string
@@ -22,16 +24,20 @@ type viewData struct {
 	Invites          []db.Invite
 	InviteRows       []inviteRow
 	Invite           db.Invite
-	Registrations    []db.Registration
-	PublicURL        string
-	Token            string
-	FormUsername     string
-	Stats            dashboardStats
-	HealthChecks     []healthCheck
-	Webhooks         []db.Webhook
-	AuditEvents      []db.AuditEvent
-	WebhookEvents    []webhookEventOption
-	UserRows         []managedUserRow
+	// InviteExpiryChoice preserves the submitted selector when rendering a
+	// validation error; parsed expiry timestamps alone cannot distinguish a
+	// quick choice from a custom date.
+	InviteExpiryChoice string
+	Registrations      []db.Registration
+	PublicURL          string
+	Token              string
+	FormUsername       string
+	Stats              dashboardStats
+	HealthChecks       []healthCheck
+	Webhooks           []db.Webhook
+	AuditEvents        []db.AuditEvent
+	WebhookEvents      []webhookEventOption
+	UserRows           []managedUserRow
 }
 
 type managedUserRow struct {

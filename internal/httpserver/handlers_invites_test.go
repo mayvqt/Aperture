@@ -20,13 +20,38 @@ func TestInvitesListShowsSavedCopyButtons(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	for _, want := range []string{`data-copy="invite-url-1"`, "https://aperture.example/i/saved-token", "account access", "alice", "Duplicate"} {
+	for _, want := range []string{`data-copy="invite-url-1"`, `aria-describedby="copy-status-1"`, `role="status"`, "https://aperture.example/i/saved-token", "account access", "alice", "Duplicate"} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("body missing %q:\n%s", want, body)
 		}
 	}
 	if strings.Contains(body, ">Enable</button>") {
 		t.Fatalf("active invite row should not show Enable action:\n%s", body)
+	}
+}
+
+func TestInvitesNewCustomExpiryIsProgressivelyEnhanced(t *testing.T) {
+	store := newFakeStore()
+	handler := New(testConfig(), store, &fakeMediaServer{})
+	req := adminRequest(t, http.MethodGet, "/admin/invites/new", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{
+		`name="expires_after_days"`,
+		`aria-controls="custom-expiry-field"`,
+		`id="custom-expiry-field"`,
+		`name="expires_at"`,
+		`id="custom-expiry-hint"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("body missing progressive expiry control %q:\n%s", want, body)
+		}
 	}
 }
 
@@ -115,10 +140,11 @@ func TestInvitesCreateRequiresAPIKey(t *testing.T) {
 	cfg.APIKeyManaged = false
 	handler := New(cfg, store, &fakeMediaServer{})
 	form := url.Values{
-		"csrf":        {store.session.CSRFSecret},
-		"label":       {"Family"},
-		"template_id": {"1"},
-		"max_uses":    {"1"},
+		"csrf":             {store.session.CSRFSecret},
+		"label":            {"Keep this label"},
+		"template_id":      {"1"},
+		"max_uses":         {"12"},
+		"user_expiry_days": {"30"},
 	}
 	req := adminRequest(t, http.MethodPost, "/admin/invites", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -126,11 +152,85 @@ func TestInvitesCreateRequiresAPIKey(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), "API key required") {
+	if rr.Code != http.StatusConflict || !strings.Contains(rr.Body.String(), "Save a media-server API key") {
 		t.Fatalf("status = %d; body %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{`value="Keep this label"`, `value="12"`, `value="30"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("validation response missing preserved field %q:\n%s", want, body)
+		}
 	}
 	if store.createdInvite.ID != 0 {
 		t.Fatal("invite was created without an API key")
+	}
+}
+
+func TestInvitesCreateValidationRendersFormAndPreservesSafeFields(t *testing.T) {
+	store := newFakeStore()
+	handler := New(testConfig(), store, &fakeMediaServer{})
+	form := url.Values{
+		"csrf":               {store.session.CSRFSecret},
+		"label":              {"Keep this label"},
+		"template_id":        {"not-a-template"},
+		"max_uses":           {"12"},
+		"expires_after_days": {"custom"},
+		"expires_at":         {"2030-01-02"},
+		"user_expiry_days":   {"30"},
+	}
+	req := adminRequest(t, http.MethodPost, "/admin/invites", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400; body %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	for _, want := range []string{"Choose a valid template.", `value="Keep this label"`, `value="12"`, `value="30"`, `value="2030-01-02"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("validation response missing %q:\n%s", want, body)
+		}
+	}
+	for _, secret := range []string{store.settings.APIKey, store.settings.InviteSecret, "saved-token"} {
+		if strings.Contains(body, secret) {
+			t.Fatalf("validation response leaked secret %q", secret)
+		}
+	}
+}
+
+func TestInvitesCreateValidationPreservesQuickExpiryChoice(t *testing.T) {
+	for _, choice := range []string{"1", "7", "30"} {
+		t.Run(choice, func(t *testing.T) {
+			store := newFakeStore()
+			handler := New(testConfig(), store, &fakeMediaServer{})
+			form := url.Values{
+				"csrf":               {store.session.CSRFSecret},
+				"label":              {"Family"},
+				"template_id":        {"not-a-template"},
+				"max_uses":           {"2"},
+				"expires_after_days": {choice},
+				"expires_at":         {"2030-01-02"},
+				"user_expiry_days":   {"0"},
+			}
+			req := adminRequest(t, http.MethodPost, "/admin/invites", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want 400; body %s", rr.Code, rr.Body.String())
+			}
+			body := rr.Body.String()
+			if !strings.Contains(body, `option value="`+choice+`" selected`) {
+				t.Fatalf("expiry choice %q was not preserved:\n%s", choice, body)
+			}
+			if strings.Contains(body, `option value="custom" selected`) {
+				t.Fatalf("quick expiry choice %q was rendered as custom:\n%s", choice, body)
+			}
+		})
 	}
 }
 

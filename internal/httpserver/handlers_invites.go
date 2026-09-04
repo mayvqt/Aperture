@@ -56,21 +56,28 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 		s.message(w, "Invalid request", "The invite form could not be read.", http.StatusBadRequest)
 		return
 	}
-	templateID, err := strconv.ParseInt(r.FormValue("template_id"), 10, 64)
-	if err != nil {
-		s.message(w, "Invalid template", "Choose a valid template.", http.StatusBadRequest)
-		return
+	// Keep only the non-sensitive fields needed to restore the form after a
+	// validation failure. In particular, never copy token or credential values
+	// from the request into view data.
+	invite := db.Invite{
+		Label:          strings.TrimSpace(r.FormValue("label")),
+		MaxUses:        boundedFormInt(r.Form, "max_uses", 1, 1, 500),
+		UserExpiryDays: boundedFormInt(r.Form, "user_expiry_days", 0, 0, 3650),
 	}
-	maxUses := boundedFormInt(r.Form, "max_uses", 1, 1, 500)
-	userExpiryDays := boundedFormInt(r.Form, "user_expiry_days", 0, 0, 3650)
 	expiresAt, err := parseInviteExpiry(r.Form)
 	if err != nil {
-		s.message(w, "Invalid date", err.Error(), http.StatusBadRequest)
+		s.renderInviteCreateError(w, r, session, invite, err.Error(), http.StatusBadRequest)
 		return
 	}
-	label := strings.TrimSpace(r.FormValue("label"))
-	if len([]rune(label)) > maxInviteLabelLength {
-		s.message(w, "Invalid label", "Invite labels must be at most 200 characters.", http.StatusBadRequest)
+	invite.ExpiresAt = expiresAt
+	templateID, err := strconv.ParseInt(r.FormValue("template_id"), 10, 64)
+	if err != nil {
+		s.renderInviteCreateError(w, r, session, invite, "Choose a valid template.", http.StatusBadRequest)
+		return
+	}
+	invite.TemplateID = templateID
+	if len([]rune(invite.Label)) > maxInviteLabelLength {
+		s.renderInviteCreateError(w, r, session, invite, "Invite labels must be at most 200 characters.", http.StatusBadRequest)
 		return
 	}
 	settings, err := s.settings(r.Context())
@@ -79,7 +86,7 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 		return
 	}
 	if strings.TrimSpace(settings.APIKey) == "" {
-		s.message(w, "API key required", "Save a media-server API key in settings before creating invite links.", http.StatusConflict)
+		s.renderInviteCreateError(w, r, session, invite, "Save a media-server API key in settings before creating invite links.", http.StatusConflict)
 		return
 	}
 	token, err := security.RandomToken(32)
@@ -92,19 +99,33 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 		TokenHash:       hash,
 		TokenPrefix:     security.Prefix(token),
 		Token:           token,
-		Label:           label,
+		Label:           invite.Label,
 		TemplateID:      templateID,
 		ExpiresAt:       expiresAt,
-		MaxUses:         maxUses,
-		UserExpiryDays:  userExpiryDays,
+		MaxUses:         invite.MaxUses,
+		UserExpiryDays:  invite.UserExpiryDays,
 		CreatedByUserID: session.UserID,
 	})
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	s.audit(r, session, "invite.create", "invite", strconv.FormatInt(inviteID, 10), map[string]any{"label": label, "max_uses": maxUses})
+	s.audit(r, session, "invite.create", "invite", strconv.FormatInt(inviteID, 10), map[string]any{"label": invite.Label, "max_uses": invite.MaxUses})
 	http.Redirect(w, r, "/admin/invites", http.StatusSeeOther)
+}
+
+func (s *Server) renderInviteCreateError(w http.ResponseWriter, r *http.Request, session db.Session, invite db.Invite, message string, status int) {
+	templates, err := s.store.ListTemplates(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	data := s.data(r, session)
+	data.Error = message
+	data.Templates = templates
+	data.Invite = invite
+	data.InviteExpiryChoice = strings.TrimSpace(r.FormValue("expires_after_days"))
+	renderStatus(w, "invite-new", data, status)
 }
 func (s *Server) invitesDisable(w http.ResponseWriter, r *http.Request, session db.Session) {
 	s.setInviteState(w, r, session, false)

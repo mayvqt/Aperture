@@ -132,7 +132,7 @@ func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
 		s.error(w, err)
 		return
 	}
-	render(w, "login", viewData{CSRF: csrf, ServerName: s.serverName()})
+	render(w, "login", viewData{AuthTitle: "Sign in · Aperture", CSRF: csrf, ServerName: s.serverName()})
 }
 func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 	if !s.validAnonymousCSRF(r) {
@@ -184,6 +184,7 @@ func (s *Server) setupViewData(provider, publicURL, serverURL, csrf, message str
 		provider = string(mediaserver.ProviderJellyfin)
 	}
 	return viewData{
+		AuthTitle:        "Setup · Aperture",
 		Error:            message,
 		Provider:         provider,
 		PublicURL:        publicURL,
@@ -222,6 +223,7 @@ func (s *Server) renderLoginFailure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, "login", viewData{
+		AuthTitle:  "Sign in · Aperture",
 		Error:      "Login failed or the media-server user is not an administrator.",
 		CSRF:       csrf,
 		ServerName: s.serverName(),

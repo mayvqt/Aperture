@@ -26,9 +26,9 @@
         {{if .Invite.Token}}
         <div class="invite-link-cell">
             <code class="row-url" id="invite-url-{{.Invite.ID}}">{{inviteURL $.PublicURL .Invite.Token}}</code>
-            <button aria-label="Copy invite URL" class="secondary small" data-copy="invite-url-{{.Invite.ID}}"
-                    type="button">Copy
-            </button>
+            <button aria-describedby="copy-status-{{.Invite.ID}}" aria-label="Copy invite URL" class="secondary small"
+                    data-copy="invite-url-{{.Invite.ID}}" type="button">Copy</button>
+            <span class="copy-status" id="copy-status-{{.Invite.ID}}" role="status" aria-live="polite"></span>
         </div>
         {{else}}<p class="muted">This link is no longer available to copy.</p>{{end}}
         <div class="row-actions">{{if .Invite.Enabled}}
@@ -75,15 +75,17 @@
             <label>Max uses<input max="500" min="1" name="max_uses" required
                                   type="number" value="{{if .Invite.MaxUses}}{{.Invite.MaxUses}}{{else}}1{{end}}">
             </label>
-            <label>Link expires<select name="expires_after_days">
-                <option value="0" {{if not .Invite.ExpiresAt.Valid}}selected{{end}}>Never</option>
-                <option value="1">24 hours</option>
-                <option value="7">7 days</option>
-                <option value="30">30 days</option>
-                <option value="custom" {{if .Invite.ExpiresAt.Valid}}selected{{end}}>Custom date</option>
+            <label>Link expires<select aria-controls="custom-expiry-field" name="expires_after_days">
+                <option value="0" {{if or (eq .InviteExpiryChoice "0") (and (eq .InviteExpiryChoice "") (not .Invite.ExpiresAt.Valid))}}selected{{end}}>Never</option>
+                <option value="1" {{if eq .InviteExpiryChoice "1"}}selected{{end}}>24 hours</option>
+                <option value="7" {{if eq .InviteExpiryChoice "7"}}selected{{end}}>7 days</option>
+                <option value="30" {{if eq .InviteExpiryChoice "30"}}selected{{end}}>30 days</option>
+                <option value="custom" {{if or (eq .InviteExpiryChoice "custom") (and (eq .InviteExpiryChoice "") .Invite.ExpiresAt.Valid)}}selected{{end}}>Custom date</option>
             </select>
             </label>
-            <label>Custom expiry date<input name="expires_at" type="date" value="{{nullDate .Invite.ExpiresAt}}">
+            <label id="custom-expiry-field">Custom expiry date
+                <span class="hint" id="custom-expiry-hint">Only used when Custom date is selected. Leave blank for no expiry.</span>
+                <input aria-describedby="custom-expiry-hint" name="expires_at" type="date" value="{{nullDate .Invite.ExpiresAt}}">
             </label>
             <label>Account access (days)<span class="hint">Use 0 for access that does not expire.</span>
                 <input max="3650" min="0" name="user_expiry_days" required type="number"

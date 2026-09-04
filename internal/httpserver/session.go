@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
@@ -88,8 +89,31 @@ func (s *Server) session(r *http.Request) (db.Session, bool, error) {
 	}
 	return session, true, nil
 }
-func (s *Server) data(_ *http.Request, session db.Session) viewData {
-	return viewData{Admin: true, Username: session.Username, CSRF: session.CSRFSecret}
+func (s *Server) data(r *http.Request, session db.Session) viewData {
+	path := strings.TrimSuffix(r.URL.Path, "/")
+	if path == "" {
+		path = "/"
+	}
+	page, title := path, "Aperture"
+	switch {
+	case path == "/admin":
+		page, title = "/admin", "Dashboard"
+	case strings.HasPrefix(path, "/admin/invites"):
+		page, title = "/admin/invites", "Invites"
+	case strings.HasPrefix(path, "/admin/templates"):
+		page, title = "/admin/templates", "Templates"
+	case strings.HasPrefix(path, "/admin/registrations"):
+		page, title = "/admin/registrations", "Registrations"
+	case strings.HasPrefix(path, "/admin/users"):
+		page, title = "/admin/users", "Users"
+	case strings.HasPrefix(path, "/admin/webhooks"):
+		page, title = "/admin/webhooks", "Webhooks"
+	case strings.HasPrefix(path, "/admin/audit"):
+		page, title = "/admin/audit", "Audit log"
+	case strings.HasPrefix(path, "/admin/settings"):
+		page, title = "/admin/settings", "Settings"
+	}
+	return viewData{Admin: true, Username: session.Username, CSRF: session.CSRFSecret, Title: title, CurrentPage: page}
 }
 func (s *Server) validCSRF(r *http.Request, expected string) bool {
 	actual, ok := formCSRF(r)

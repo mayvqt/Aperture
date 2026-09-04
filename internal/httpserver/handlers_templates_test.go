@@ -42,6 +42,7 @@ func TestTemplatesCreateStripsAdminPrivilege(t *testing.T) {
 
 func TestTemplatesPageUsesExpandableWorkflows(t *testing.T) {
 	store := newFakeStore()
+	store.template.IsDefault = false
 	handler := New(testConfig(), store, &fakeMediaServer{})
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/templates", nil))
@@ -54,6 +55,9 @@ func TestTemplatesPageUsesExpandableWorkflows(t *testing.T) {
 		!strings.Contains(body, `<details class="panel workflow-card">`) ||
 		!strings.Contains(body, "Existing templates") {
 		t.Fatalf("templates page is not using expandable workflow panels:\n%s", body)
+	}
+	if !strings.Contains(body, `data-confirm="Delete this template? This cannot be undone."`) {
+		t.Fatalf("template delete form is missing confirmation:\n%s", body)
 	}
 }
 
@@ -89,6 +93,9 @@ func TestTemplateDetailShowsPreviewAndUpdatesTemplate(t *testing.T) {
 		if strings.Contains(body, unwanted) {
 			t.Fatalf("body should not show %q:\n%s", unwanted, body)
 		}
+	}
+	if !strings.Contains(body, `data-confirm="Delete this template? This cannot be undone."`) {
+		t.Fatalf("template detail delete form is missing confirmation:\n%s", body)
 	}
 
 	form := url.Values{

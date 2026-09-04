@@ -70,7 +70,7 @@ func (s *Server) setupComplete(ctx context.Context) (bool, error) {
 	return settings.Provider != "" && settings.ServerURL != "" && publicURL != "", nil
 }
 func (s *Server) message(w http.ResponseWriter, title, message string, status int) {
-	renderStatus(w, "message", viewData{Title: title, Message: message}, status)
+	renderStatus(w, "message", viewData{AuthTitle: "Message · Aperture", Title: title, Message: message}, status)
 }
 func (s *Server) error(w http.ResponseWriter, err error) {
 	slog.Error("request failed", "error", safeError(err))
