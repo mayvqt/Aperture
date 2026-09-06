@@ -227,6 +227,14 @@ func (f *fakeStore) FailUserCreation(_ context.Context, _ int64, _ string) error
 	f.completedStatus = db.RegistrationFailedCreateUser
 	return nil
 }
+func (f *fakeStore) RecordFailedUserCreation(ctx context.Context, _ int64, userID, _ string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	f.recordedUserID = userID
+	f.completedStatus = db.RegistrationFailedCreateUser
+	return nil
+}
 func (f *fakeStore) RecordCreatedUser(_ context.Context, _ int64, userID string) error {
 	f.recordedUserID = userID
 	return nil

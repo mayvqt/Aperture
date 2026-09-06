@@ -261,3 +261,47 @@ func TestDashboardCountsCoverFullHistory(t *testing.T) {
 		t.Fatalf("DashboardCounts = %#v", counts)
 	}
 }
+
+func TestPartialUserCreationCannotRetryTemplate(t *testing.T) {
+	ctx, store := testStore(t)
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "partial-account", TemplateID: 1, MaxUses: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordFailedUserCreation(ctx, id, "partial-user", "password setup failed"); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("partial creation accepted reserved state: %v", err)
+	}
+	if err := store.BeginUserCreation(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RecordFailedUserCreation(ctx, id, "", "password setup failed"); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("partial creation accepted missing user ID: %v", err)
+	}
+	if err := store.RecordFailedUserCreation(ctx, id, "partial-user", "password setup failed"); err != nil {
+		t.Fatal(err)
+	}
+	registration, err := store.Registration(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if registration.Status != RegistrationFailedCreateUser || registration.ExternalUserID.String != "partial-user" {
+		t.Fatalf("partial account was not durably isolated: status=%q id=%q", registration.Status, registration.ExternalUserID.String)
+	}
+	if _, err := store.ClaimTemplateRecovery(ctx, id); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("partial account allowed manual template retry: %v", err)
+	}
+	if due, err := store.DueTemplateRecoveries(ctx, 10); err != nil || len(due) != 0 {
+		t.Fatalf("partial account allowed automatic template retry: count=%d err=%v", len(due), err)
+	}
+	if err := store.RecordFailedUserCreation(ctx, id, "other-user", "replacement"); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("partial account allowed repeated transition: %v", err)
+	}
+	invite, err := store.InviteByHash(ctx, "partial-account")
+	if err != nil || invite.Uses != 1 {
+		t.Fatalf("partial creation released invite use: uses=%d err=%v", invite.Uses, err)
+	}
+}

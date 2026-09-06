@@ -30,6 +30,7 @@ type Server struct {
 	trustedProxies   []*net.IPNet
 	hstsHost         string
 	runtimeMu        sync.RWMutex
+	setupMu          sync.Mutex
 	provider         string
 	runtimePublicURL string
 	cookieSecure     bool

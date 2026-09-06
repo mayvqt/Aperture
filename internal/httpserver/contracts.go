@@ -30,6 +30,7 @@ type Store interface {
 	ReserveInviteUse(context.Context, int64, string, string, string) (int64, db.Template, error)
 	BeginUserCreation(context.Context, int64) error
 	FailUserCreation(context.Context, int64, string) error
+	RecordFailedUserCreation(context.Context, int64, string, string) error
 	RecordCreatedUser(context.Context, int64, string) error
 	CompleteRegistration(context.Context, int64, string, string, sql.NullTime) error
 	ReconcileStaleRegistrations(context.Context, time.Time, int) (db.ReconciliationResult, error)

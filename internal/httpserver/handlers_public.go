@@ -1,16 +1,20 @@
 package httpserver
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
 	"github.com/mayvqt/aperture/internal/security"
 )
+
+const registrationProvisioningTimeout = 2 * time.Minute
 
 func (s *Server) publicInvite(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
@@ -84,24 +88,38 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	// Once an invite use is committed, finish account security and persistence
+	// even if the browser disconnects. The operation remains time-bounded.
+	provisionCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), registrationProvisioningTimeout)
+	defer cancel()
+	r = r.WithContext(provisionCtx)
 	if err := s.store.BeginUserCreation(r.Context(), regID); err != nil {
 		s.error(w, err)
 		return
 	}
 	user, err := s.media.CreateUser(r.Context(), settings.ServerURL, settings.APIKey, username, password)
-	if err != nil {
-		if user.ID != "" {
-			if recordErr := s.store.RecordCreatedUser(r.Context(), regID, user.ID); recordErr != nil {
-				s.error(w, recordErr)
+	provisioned := false
+	if user.ID != "" {
+		defer func() {
+			if provisioned {
 				return
 			}
-			if recordErr := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationNeedsAttention, safeError(err), sql.NullTime{}); recordErr != nil {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
+			defer cleanupCancel()
+			if err := s.media.DisableUser(cleanupCtx, settings.ServerURL, settings.APIKey, user.ID); err != nil {
+				slog.Error("could not disable incomplete account", "registration_id", regID, "error", safeError(err))
+			}
+		}()
+	}
+	if err != nil {
+		if user.ID != "" {
+			if recordErr := s.store.RecordFailedUserCreation(r.Context(), regID, user.ID, safeError(err)); recordErr != nil {
 				s.error(w, recordErr)
 				return
 			}
 			slog.Warn("media-server user creation was partial", "registration_id", regID, "error", safeError(err))
 			s.notify(webhookNotice{Event: "registration.failed", Title: "Registration needs review", Description: "The account was created but setup was incomplete.", Color: 0xe67e22, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Error": safeError(err)}})
-			s.message(w, "Account needs review", "The account was created but disabled because setup was incomplete. Ask the server admin to review it.", http.StatusAccepted)
+			s.message(w, "Account needs review", "Account setup was incomplete. Ask the server admin to review the account before signing in.", http.StatusAccepted)
 			return
 		}
 		if recordErr := s.store.FailUserCreation(r.Context(), regID, safeError(err)); recordErr != nil {
@@ -129,6 +147,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.error(w, err)
 		return
 	}
+	provisioned = true
 	if err := s.store.Audit(r.Context(), "", "registration.complete", "invite", strconv.FormatInt(invite.ID, 10), remoteIP, requestUserAgent(r), "{}"); err != nil {
 		slog.Warn("could not record registration audit event", "registration_id", regID, "error", safeError(err))
 	}
