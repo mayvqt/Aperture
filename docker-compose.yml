@@ -16,7 +16,7 @@ services:
       - "8099:8099"
 
     volumes:
-      - /mnt/cache/appdata/aperture:/config
+      - ${APERTURE_DATA_DIR:-/mnt/cache/appdata/aperture}:/config
 
     environment:
       APERTURE_HTTP_ADDR: "${APERTURE_HTTP_ADDR:-:8099}"

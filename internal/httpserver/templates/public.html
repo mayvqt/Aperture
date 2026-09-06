@@ -12,7 +12,7 @@
             <input name="csrf" type="hidden" value="{{.CSRF}}">
             <label>Username<span class="hint">Use 3-32 letters, numbers, dots, underscores, or hyphens.</span>
                 <input autocomplete="username" autofocus maxlength="32" minlength="3" name="username"
-                       pattern="[A-Za-z0-9._-]{3,32}" required value="{{.FormUsername}}">
+                       pattern="[A-Za-z0-9._\-]{3,32}" required value="{{.FormUsername}}">
             </label>
             <label>Password<span class="hint">At least 8 characters.</span>
                 <input autocomplete="new-password" minlength="8" name="password" required type="password">

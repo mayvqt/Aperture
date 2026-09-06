@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/mediaserver/protocol"
@@ -46,7 +47,9 @@ func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, pass
 	if err == nil {
 		return user, nil
 	}
-	if disableErr := c.DisableUser(ctx, baseURL, apiKey, user.ID); disableErr != nil {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	if disableErr := c.DisableUser(cleanupCtx, baseURL, apiKey, user.ID); disableErr != nil {
 		return user, fmt.Errorf("set Emby password: %w; disable incomplete account: %v", err, disableErr)
 	}
 	return user, fmt.Errorf("set Emby password (incomplete account disabled): %w", err)
