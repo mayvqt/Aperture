@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/security"
 )
 
@@ -233,5 +236,104 @@ func TestGuideRendersAccountCreatedMessage(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("guide missing %q:\n%s", want, body)
 		}
+	}
+}
+
+type provisioningStore struct {
+	*fakeStore
+	recordError   error
+	completeError error
+}
+
+func (s *provisioningStore) RecordCreatedUser(ctx context.Context, id int64, userID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if s.recordError != nil {
+		return s.recordError
+	}
+	return s.fakeStore.RecordCreatedUser(ctx, id, userID)
+}
+
+func (s *provisioningStore) CompleteRegistration(ctx context.Context, id int64, status, message string, expiry sql.NullTime) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if s.completeError != nil {
+		return s.completeError
+	}
+	return s.fakeStore.CompleteRegistration(ctx, id, status, message, expiry)
+}
+
+type provisioningMedia struct {
+	*fakeMediaServer
+	cancel       context.CancelFunc
+	partialError error
+}
+
+func (m *provisioningMedia) CreateUser(ctx context.Context, baseURL, key, username, password string) (mediaserver.User, error) {
+	user, err := m.fakeMediaServer.CreateUser(ctx, baseURL, key, username, password)
+	if m.cancel != nil {
+		m.cancel()
+	}
+	if m.partialError != nil {
+		return user, m.partialError
+	}
+	return user, err
+}
+
+func (m *provisioningMedia) ApplyTemplate(ctx context.Context, baseURL, key, userID string, template db.Template) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.fakeMediaServer.ApplyTemplate(ctx, baseURL, key, userID, template)
+}
+
+func (m *provisioningMedia) DisableUser(ctx context.Context, baseURL, key, userID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return m.fakeMediaServer.DisableUser(ctx, baseURL, key, userID)
+}
+
+func TestPublicRegisterProtectsIncompleteProvisioning(t *testing.T) {
+	for _, scenario := range []string{"disconnect after create", "password failure", "template failure", "record failure", "completion failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			store := &provisioningStore{fakeStore: newFakeStore()}
+			store.invite.UserExpiryDays = 7
+			media := &provisioningMedia{fakeMediaServer: &fakeMediaServer{}}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			switch scenario {
+			case "disconnect after create":
+				media.cancel = cancel
+			case "password failure":
+				media.partialError = errors.New("password setup failed")
+			case "template failure":
+				media.applyErr = errors.New("policy update failed")
+			case "record failure":
+				store.recordError = errors.New("database write failed")
+			case "completion failure":
+				store.completeError = errors.New("database write failed")
+			}
+			handler := New(testConfig(), store, media)
+			token, csrf := "public-invite-token", "csrf-value"
+			form := url.Values{"csrf": {csrf}, "username": {"new_user"}, "password": {"correct horse"}, "confirm_password": {"correct horse"}}
+			req := httptest.NewRequest(http.MethodPost, "/i/"+token+"/register", strings.NewReader(form.Encode())).WithContext(ctx)
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(&http.Cookie{Name: publicCSRFCookie, Value: security.HashToken(store.settings.InviteSecret, token+":"+csrf)})
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+			if scenario == "disconnect after create" {
+				if rr.Code != http.StatusSeeOther || !media.appliedTemplate || store.recordedUserID != "new-media-user" || !store.completedDisableAt.Valid || media.disabledUserID != "" {
+					t.Fatalf("disconnect interrupted provisioning: status=%d applied=%t persisted=%q expiry=%t disabled=%q", rr.Code, media.appliedTemplate, store.recordedUserID, store.completedDisableAt.Valid, media.disabledUserID)
+				}
+			} else if media.disabledUserID != "new-media-user" {
+				t.Fatalf("incomplete account was not disabled: %q", media.disabledUserID)
+			}
+			if scenario == "password failure" && (store.completedStatus != db.RegistrationFailedCreateUser || store.recordedUserID != "new-media-user" || media.appliedTemplate) {
+				t.Fatalf("partial password setup became eligible for template retry: status=%q user=%q applied=%t", store.completedStatus, store.recordedUserID, media.appliedTemplate)
+			}
+		})
 	}
 }

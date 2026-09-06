@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mayvqt/aperture/internal/config"
 	"github.com/mayvqt/aperture/internal/mediaserver"
@@ -335,5 +337,83 @@ func TestLoginRateLimitsRotatingUsernamesByClientIP(t *testing.T) {
 		if i == 50 && rr.Code != http.StatusTooManyRequests {
 			t.Fatalf("attempt %d status = %d, want 429", i+1, rr.Code)
 		}
+	}
+}
+
+// setupPingMedia holds the first setup request in its upstream validation call.
+type setupPingMedia struct {
+	*fakeMediaServer
+	started   chan struct{}
+	release   chan struct{}
+	pingError error
+}
+
+func (m *setupPingMedia) Ping(context.Context, string, string) error {
+	close(m.started)
+	<-m.release
+	return m.pingError
+}
+
+func TestConcurrentSetupCannotOverwriteCompletedConfiguration(t *testing.T) {
+	for _, failFirst := range []bool{false, true} {
+		t.Run(fmt.Sprintf("first_ping_fails_%t", failFirst), func(t *testing.T) {
+			store := newFakeStore()
+			store.settings.Provider = ""
+			store.settings.PublicURL = ""
+			store.settings.ServerURL = ""
+			media := &setupPingMedia{fakeMediaServer: &fakeMediaServer{provider: mediaserver.ProviderJellyfin}, started: make(chan struct{}), release: make(chan struct{})}
+			if failFirst {
+				media.pingError = errors.New("upstream unavailable")
+			}
+			handler := New(config.Config{MediaProvider: "jellyfin"}, store, media)
+			secret := store.settings.SessionSecret
+			post := func(provider, serverURL, apiKey string) *httptest.ResponseRecorder {
+				form := url.Values{"csrf": {"csrf-value"}, "provider": {provider}, "public_url": {"https://join.example.test"}, "server_url": {serverURL}, "api_key": {apiKey}}
+				req := httptest.NewRequest(http.MethodPost, "/setup", strings.NewReader(form.Encode()))
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.AddCookie(&http.Cookie{Name: anonymousCSRFCookie, Value: security.HashToken(secret, "csrf-value")})
+				rr := httptest.NewRecorder()
+				handler.ServeHTTP(rr, req)
+				return rr
+			}
+			firstDone := make(chan *httptest.ResponseRecorder, 1)
+			go func() { firstDone <- post("emby", "http://first-media:8096", "first-key") }()
+			select {
+			case <-media.started:
+			case <-time.After(time.Second):
+				t.Fatal("first setup never reached upstream validation")
+			}
+			secondDone := make(chan *httptest.ResponseRecorder, 1)
+			go func() { secondDone <- post("jellyfin", "http://second-media:8096", "") }()
+			var second *httptest.ResponseRecorder
+			select {
+			case second = <-secondDone:
+				t.Error("second setup completed while the first could still mutate configuration")
+			case <-time.After(50 * time.Millisecond):
+			}
+			close(media.release)
+			select {
+			case <-firstDone:
+			case <-time.After(time.Second):
+				t.Fatal("first setup did not finish")
+			}
+			if second == nil {
+				select {
+				case second = <-secondDone:
+				case <-time.After(time.Second):
+					t.Fatal("second setup did not finish")
+				}
+			}
+			if second.Code != http.StatusSeeOther {
+				t.Fatalf("second setup status = %d", second.Code)
+			}
+			wantProvider, wantURL := "emby", "http://first-media:8096/emby"
+			if failFirst {
+				wantProvider, wantURL = "jellyfin", "http://second-media:8096"
+			}
+			if store.settings.Provider != wantProvider || store.settings.ServerURL != wantURL || string(media.provider) != wantProvider || len(store.settingWrites) != 4 {
+				t.Fatalf("setup did not preserve the single successful configuration: stored provider=%q runtime provider=%q writes=%d", store.settings.Provider, media.provider, len(store.settingWrites))
+			}
+		})
 	}
 }

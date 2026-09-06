@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestClientUsesEmbyAuthorizationAndSetsPasswordSeparately(t *testing.T) {
@@ -93,5 +94,43 @@ func response(status int, body string) *http.Response {
 		Header:  http.Header{"Content-Type": []string{"application/json"}},
 		Body:    io.NopCloser(bytes.NewBufferString(body)),
 		Request: (&http.Request{}).WithContext(context.Background()),
+	}
+}
+
+func TestPasswordCancellationStillDisablesIncompleteAccount(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	disabled := false
+	client := NewWithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := r.Context().Err(); err != nil {
+			return nil, err
+		}
+		switch r.URL.Path {
+		case "/emby/Users/New":
+			return response(http.StatusOK, `{"Id":"partial-user","Name":"alice"}`), nil
+		case "/emby/Users/partial-user/Password":
+			cancel()
+			return nil, ctx.Err()
+		case "/emby/Users/partial-user":
+			deadline, ok := r.Context().Deadline()
+			if !ok || time.Until(deadline) > 10*time.Second {
+				t.Fatal("cleanup context is not bounded")
+			}
+			return response(http.StatusOK, `{"Policy":{"IsAdministrator":false}}`), nil
+		case "/emby/Users/partial-user/Policy":
+			var policy map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
+				t.Fatal(err)
+			}
+			disabled = policy["IsDisabled"] == true
+			return response(http.StatusNoContent, ""), nil
+		default:
+			t.Fatalf("unexpected cleanup target %s", r.URL.Path)
+			return nil, nil
+		}
+	})})
+	user, err := client.CreateUser(ctx, "http://emby.test", "api-key", "alice", "password")
+	if err == nil || user.ID != "partial-user" || !disabled {
+		t.Fatalf("password cancellation left incomplete account enabled: user=%q disabled=%t err=%v", user.ID, disabled, err)
 	}
 }
