@@ -14,3 +14,19 @@ Complete the unauthenticated first-run `/setup` flow on a trusted network before
 
 Administrative audit events are retained for 90 days. Maintenance removes expired events in bounded batches to keep
 the application database from growing indefinitely.
+
+## Provisioning failures and upgrades
+
+Initial setup is serialized within the application process so a delayed request
+cannot overwrite completed setup. Run one Aperture process per state directory.
+After an invite use is reserved, account provisioning continues for a bounded
+period even if the browser disconnects. Incomplete accounts are disabled when
+the media server is reachable; failed cleanup requires administrator intervention.
+Accounts with incomplete password setup retain their external ID for review and
+cannot be enabled through automatic or manual template-only retries.
+
+Before upgrading an existing installation, review older `needs_attention`
+registrations in the media server, especially password-setup failures. Earlier
+records are not reclassified by this release. Keep any incomplete accounts
+disabled and finish password setup before allowing a template retry. Do this
+before restarting Aperture, since maintenance can retry eligible records.

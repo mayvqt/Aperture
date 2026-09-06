@@ -45,6 +45,10 @@ func (s *Server) setupForm(w http.ResponseWriter, r *http.Request) {
 	render(w, "setup", s.setupViewData(settings.Provider, publicURL, settings.ServerURL, csrf, ""))
 }
 func (s *Server) setupPost(w http.ResponseWriter, r *http.Request) {
+	// Keep readiness checks, provider validation, and persistence in one claim.
+	// A waiting setup request must recheck completion before changing providers.
+	s.setupMu.Lock()
+	defer s.setupMu.Unlock()
 	complete, err := s.setupComplete(r.Context())
 	if err != nil {
 		s.error(w, err)

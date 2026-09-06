@@ -20,6 +20,23 @@ func (s *Store) FailUserCreation(ctx context.Context, registrationID int64, mess
 	return requireSingleTransition(result)
 }
 
+// RecordFailedUserCreation preserves a partial account without making it
+// eligible for a template-only retry before password setup is complete.
+func (s *Store) RecordFailedUserCreation(ctx context.Context, registrationID int64, externalUserID, message string) error {
+	if externalUserID == "" {
+		return ErrRegistrationTransition
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE registrations
+		SET external_user_id = ?, status = ?, error_message = NULLIF(?, ''), updated_at = CURRENT_TIMESTAMP
+		WHERE id = ? AND status = ?
+	`, externalUserID, RegistrationFailedCreateUser, message, registrationID, RegistrationCreatingUser)
+	if err != nil {
+		return err
+	}
+	return requireSingleTransition(result)
+}
+
 func (s *Store) RecordCreatedUser(ctx context.Context, registrationID int64, externalUserID string) error {
 	if externalUserID == "" {
 		return ErrRegistrationTransition

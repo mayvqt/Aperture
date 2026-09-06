@@ -11,7 +11,8 @@ the directly connected proxy CIDRs.
 
 ## Storage
 
-Docker state lives under `/config`; standalone state defaults to `./data`. Aperture generates the encryption, session,
+`APERTURE_DATA_DIR` selects the Compose host directory mounted at `/config`. Keep
+it unchanged for existing installs; see [Setup](setup.md). Docker state lives under `/config`; standalone state defaults to `./data`. Aperture generates the encryption, session,
 and invite secrets when omitted. Back up the entire state directory. If a schema is unsupported, preserve the directory
 and use a compatible Aperture version; never delete the database as a normal upgrade step.
 
