@@ -11,6 +11,11 @@ import (
 	"github.com/mayvqt/aperture/internal/mediaserver"
 )
 
+const (
+	defaultSessionTTL = 24 * time.Hour
+	rememberMeTTL     = 7 * 24 * time.Hour
+)
+
 func (s *Server) setupForm(w http.ResponseWriter, r *http.Request) {
 	complete, err := s.setupComplete(r.Context())
 	if err != nil {
@@ -170,12 +175,16 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.limiter.Reset(rateKey)
-	sessionID, _, err := s.store.CreateSession(r.Context(), auth.UserID, auth.Username, auth.AccessToken, auth.DeviceID, 24*time.Hour)
+	sessionTTL := defaultSessionTTL
+	if r.FormValue("remember_me") == "on" {
+		sessionTTL = rememberMeTTL
+	}
+	sessionID, _, err := s.store.CreateSession(r.Context(), auth.UserID, auth.Username, auth.AccessToken, auth.DeviceID, sessionTTL)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	http.SetCookie(w, s.sessionCookie(sessionID, 24*time.Hour))
+	http.SetCookie(w, s.sessionCookie(sessionID, sessionTTL))
 	s.loginIPLimiter.Reset("login-ip:" + remoteIP)
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }

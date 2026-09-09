@@ -42,6 +42,7 @@ type fakeStore struct {
 	setupSettingsErr      error
 	deletedSessionID      string
 	createdDeviceID       string
+	createdSessionTTL     time.Duration
 	webhooks              []db.Webhook
 	auditEvents           []db.AuditEvent
 	prunedAuditEvents     bool
@@ -137,8 +138,9 @@ func (f *fakeStore) UpdateSetupSettings(ctx context.Context, provider, publicURL
 	f.settings.PublicURL = publicURL
 	return nil
 }
-func (f *fakeStore) CreateSession(_ context.Context, _, _, _, deviceID string, _ time.Duration) (string, string, error) {
+func (f *fakeStore) CreateSession(_ context.Context, _, _, _, deviceID string, ttl time.Duration) (string, string, error) {
 	f.createdDeviceID = deviceID
+	f.createdSessionTTL = ttl
 	return f.session.ID, f.session.CSRFSecret, nil
 }
 func (f *fakeStore) Session(_ context.Context, id string) (db.Session, error) {
