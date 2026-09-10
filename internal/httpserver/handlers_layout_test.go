@@ -53,6 +53,9 @@ func TestAuthPagesUseFullViewportShell(t *testing.T) {
 	if !strings.Contains(body, `<body class="auth-shell">`) || !strings.Contains(body, `<main class="auth-page">`) {
 		t.Fatalf("auth page missing full viewport shell:\n%s", body)
 	}
+	if !strings.Contains(body, `<section class="auth-wrap login-wrap">`) {
+		t.Fatalf("login page missing compact login wrapper:\n%s", body)
+	}
 	if !strings.Contains(body, `<title>Sign in · Aperture</title>`) {
 		t.Fatalf("login page missing descriptive document title:\n%s", body)
 	}

@@ -46,6 +46,9 @@ func TestAdminLoginBrowserFlow(t *testing.T) {
 	if store.createdDeviceID != "new-device-id" {
 		t.Fatalf("stored session device ID = %q, want authenticated device ID", store.createdDeviceID)
 	}
+	if store.createdSessionTTL != defaultSessionTTL {
+		t.Fatalf("stored session TTL = %s, want %s", store.createdSessionTTL, defaultSessionTTL)
+	}
 
 	adminRequest := httptest.NewRequest(http.MethodGet, "/admin", nil)
 	for _, cookie := range postResponse.Result().Cookies() {
@@ -58,6 +61,65 @@ func TestAdminLoginBrowserFlow(t *testing.T) {
 	}
 	if adminResponse.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("admin Cache-Control = %q, want no-store", adminResponse.Header().Get("Cache-Control"))
+	}
+}
+
+func TestLoginRememberMeSessionDuration(t *testing.T) {
+	tests := []struct {
+		name         string
+		rememberMe   string
+		wantDuration time.Duration
+	}{
+		{name: "unchecked", rememberMe: "", wantDuration: defaultSessionTTL},
+		{name: "checked", rememberMe: "on", wantDuration: rememberMeTTL},
+		{name: "arbitrary value", rememberMe: "yes", wantDuration: defaultSessionTTL},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := newFakeStore()
+			handler := New(testConfig(), store, &fakeMediaServer{})
+			form := url.Values{
+				"csrf":        {"csrf-value"},
+				"username":    {"admin"},
+				"password":    {"password"},
+				"remember_me": {tt.rememberMe},
+			}
+			req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.AddCookie(&http.Cookie{
+				Name:  anonymousCSRFCookie,
+				Value: security.HashToken(store.settings.SessionSecret, "csrf-value"),
+			})
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != http.StatusSeeOther {
+				t.Fatalf("status = %d, want redirect; body %s", rr.Code, rr.Body.String())
+			}
+			if store.createdSessionTTL != tt.wantDuration {
+				t.Fatalf("stored session TTL = %s, want %s", store.createdSessionTTL, tt.wantDuration)
+			}
+			cookies := rr.Result().Cookies()
+			if len(cookies) != 1 || cookies[0].MaxAge != int(tt.wantDuration/time.Second) {
+				t.Fatalf("session cookie = %#v, want MaxAge %d", cookies, int(tt.wantDuration/time.Second))
+			}
+		})
+	}
+}
+
+func TestLoginFormIncludesRememberMeControl(t *testing.T) {
+	store := newFakeStore()
+	handler := New(testConfig(), store, &fakeMediaServer{})
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/login", nil))
+
+	if rr.Code != http.StatusOK || !htmlElementHasAttributes(rr.Body.String(), "input", map[string]string{
+		"name":  "remember_me",
+		"type":  "checkbox",
+		"value": "on",
+	}) || !strings.Contains(rr.Body.String(), `<label class="remember-toggle">`) {
+		t.Fatalf("login form is missing the remember-me control:\n%s", rr.Body.String())
 	}
 }
 
