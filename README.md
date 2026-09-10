@@ -1,29 +1,13 @@
 # Aperture
 
-## Overview
-
 Aperture creates Jellyfin or Emby accounts from controlled invite links and applies non-admin policy templates.
-
-## Quick start
-
-```bash
-cp .env.example .env
-docker compose up -d --build
-```
-
-Open `http://localhost:8099`, complete browser setup, then sign in with a media-server administrator account.
-
-Complete setup on a trusted network before exposing Aperture publicly. Fresh installs keep state in `./config`;
-existing installs should retain their current data path. See [setup and backups](docs/setup.md).
 
 ## Documentation
 
-- [Setup](docs/setup.md)
-- [Configuration](docs/configuration.md)
-- [Unraid](docs/unraid.md)
-- [Security](docs/SECURITY.md)
-- [Development](docs/development.md)
-- [Contributing](docs/CONTRIBUTING.md)
+- Get started: [Setup](docs/setup.md) and [Configuration](docs/configuration.md)
+- Run Aperture: [Operations](docs/development/operations.md) and [Unraid](docs/unraid.md)
+- See what it does: [Capabilities](docs/capabilities.md)
+- Contribute: [Development](docs/development/README.md), [Contributing](docs/CONTRIBUTING.md), and [Security](docs/SECURITY.md)
 - [License](LICENSE)
 - [Issues](https://github.com/mayvqt/Aperture/issues)
 

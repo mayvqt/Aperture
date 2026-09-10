@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 )
 
@@ -151,7 +152,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		return fmt.Errorf("begin schema initialization: %w", err)
 	}
 	defer tx.Rollback()
-	if revision == 1 {
+	if revision > 0 && revision < 2 {
 		if _, err := tx.ExecContext(ctx, `ALTER TABLE registrations ADD COLUMN template_attempts INTEGER NOT NULL DEFAULT 0`); err != nil {
 			return fmt.Errorf("add template attempts: %w", err)
 		}
@@ -159,12 +160,34 @@ func (s *Store) InitSchema(ctx context.Context) error {
 			return fmt.Errorf("add template retry time: %w", err)
 		}
 	}
-	if revision == 2 {
-		if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN kind TEXT NOT NULL DEFAULT 'discord'`); err != nil {
-			return fmt.Errorf("add webhook kind: %w", err)
+	if revision > 0 && revision <= 2 {
+		var webhooksTable bool
+		if err := tx.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'webhooks'
+			)
+		`).Scan(&webhooksTable); err != nil {
+			return fmt.Errorf("inspect webhook schema: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN role_ids TEXT NOT NULL DEFAULT ''`); err != nil {
-			return fmt.Errorf("add webhook role IDs: %w", err)
+		if webhooksTable {
+			kindExists, err := schemaColumnExists(ctx, tx, "webhooks", "kind")
+			if err != nil {
+				return fmt.Errorf("inspect webhook kind: %w", err)
+			}
+			if !kindExists {
+				if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN kind TEXT NOT NULL DEFAULT 'discord'`); err != nil {
+					return fmt.Errorf("add webhook kind: %w", err)
+				}
+			}
+			roleIDsExists, err := schemaColumnExists(ctx, tx, "webhooks", "role_ids")
+			if err != nil {
+				return fmt.Errorf("inspect webhook role IDs: %w", err)
+			}
+			if !roleIDsExists {
+				if _, err := tx.ExecContext(ctx, `ALTER TABLE webhooks ADD COLUMN role_ids TEXT NOT NULL DEFAULT ''`); err != nil {
+					return fmt.Errorf("add webhook role IDs: %w", err)
+				}
+			}
 		}
 	}
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
@@ -184,4 +207,31 @@ func (s *Store) InitSchema(ctx context.Context) error {
 		return fmt.Errorf("commit schema initialization: %w", err)
 	}
 	return s.restrictDatabaseFiles()
+}
+
+type schemaQuerier interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func schemaColumnExists(ctx context.Context, db schemaQuerier, table, column string) (bool, error) {
+	rows, err := db.QueryContext(ctx, "PRAGMA table_info("+table+")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, columnType string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, err
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
 }

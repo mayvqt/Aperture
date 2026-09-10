@@ -6,5 +6,5 @@ Keep changes small and limited to secure invitation, registration, policy applic
 - Test behavior, security, persistence, and failure paths.
 - Version and test schema changes against existing databases.
 - Update affected deployment and configuration files.
-- Run every check in [development.md](development.md).
+- Use the focused checks and final gate in [Validation](development/validation.md).
 - Never commit `.env`, databases, credentials, tokens, logs, or generated artifacts.
