@@ -140,6 +140,19 @@ func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.
 }
 
 func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings, id string) (bool, error) {
+	registrations, err := s.store.UserDeletionRegistrations(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	ids := make([]int64, 0, len(registrations))
+	for _, reg := range registrations {
+		ids = append(ids, reg.ID)
+	}
+	release, err := s.claimAccountOperations(ids...)
+	if err != nil {
+		return false, err
+	}
+	defer release()
 	user, found, err := s.media.GetUser(ctx, settings.ServerURL, settings.APIKey, id)
 	if err != nil {
 		return false, err
@@ -165,6 +178,10 @@ func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings,
 }
 
 func (s *Server) userDeleteError(w http.ResponseWriter, err error, deletedUpstream bool) {
+	if errors.Is(err, db.ErrRegistrationTransition) || errors.Is(err, db.ErrNotFound) {
+		s.message(w, "User unavailable", "Only tracked accounts with no setup or recovery in progress can be deleted.", http.StatusConflict)
+		return
+	}
 	if errors.Is(err, errAdministratorDelete) {
 		s.message(w, "Cannot delete administrator", "Aperture does not delete media-server administrator accounts.", http.StatusConflict)
 		return

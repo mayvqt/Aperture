@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
@@ -32,7 +31,9 @@ type Store interface {
 	FailUserCreation(context.Context, int64, string) error
 	RecordFailedUserCreation(context.Context, int64, string, string) error
 	RecordCreatedUser(context.Context, int64, string) error
-	CompleteRegistration(context.Context, int64, string, string, sql.NullTime) error
+	RecordProvisioningUser(context.Context, int64, string) error
+	CompleteRegistration(context.Context, int64, string, string) error
+	RequireAccountCleanup(context.Context, int64, string) error
 	ReconcileStaleRegistrations(context.Context, time.Time, int) (db.ReconciliationResult, error)
 	DueUserDisables(context.Context, int) ([]db.Registration, error)
 	MarkUserDisabled(context.Context, int64) error
@@ -47,9 +48,10 @@ type Store interface {
 	ListManagedUsers(context.Context) ([]db.ManagedUser, error)
 	SaveManagedUser(context.Context, db.ManagedUser) error
 	DeleteUserRecords(context.Context, string) error
-	ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error)
+	ClaimTemplateRecovery(context.Context, int64, bool) (db.RegistrationRecovery, error)
+	UserDeletionRegistrations(context.Context, string) ([]db.Registration, error)
 	RecordTemplateRetryFailure(context.Context, int64, string) error
-	CompleteTemplateRecovery(context.Context, int64, sql.NullTime) error
+	CompleteTemplateRecovery(context.Context, int64) error
 	DashboardCounts(context.Context) (db.DashboardCounts, error)
 	LatestInviteActivity(context.Context) (map[int64]db.InviteActivity, error)
 	ListAuditEvents(context.Context, int) ([]db.AuditEvent, error)
@@ -57,7 +59,7 @@ type Store interface {
 	ListWebhooks(context.Context) ([]db.Webhook, error)
 	CreateWebhook(context.Context, db.Webhook) (int64, error)
 	DeleteWebhook(context.Context, int64) error
-	DueTemplateRecoveries(context.Context, int) ([]db.RegistrationRecovery, error)
+	ListDueTemplateRecoveryIDs(context.Context, int) ([]int64, error)
 }
 
 type MediaServer interface {

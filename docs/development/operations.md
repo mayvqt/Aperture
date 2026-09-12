@@ -31,3 +31,9 @@ the pre-upgrade state with the previous immutable image. Stop on failed health o
 data verification; preserve failed state for diagnosis. Maintenance or repair
 actions that mutate users, registrations, or SQLite state are explicit,
 operator-approved procedures, never automatic troubleshooting steps.
+
+Revision 5 resumes incomplete-account disables from durable state. Review older
+password-setup failures before upgrading as described in [Security](../SECURITY.md).
+Allow four minutes for accepted account operations to finish before SQLite
+closes. The supplied Compose and Unraid configurations allow 270 seconds,
+including notification delivery, before forcing the process to stop.

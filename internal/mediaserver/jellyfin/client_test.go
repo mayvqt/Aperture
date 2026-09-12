@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 	"io"
 	"net/http"
 	"strings"
@@ -31,7 +32,7 @@ func TestClientUsesJellyfinAuthorizationAndCreatePayload(t *testing.T) {
 		return response(http.StatusOK, `{"Id":"user-1","Name":"alice"}`), nil
 	})})
 
-	user, err := client.CreateUser(t.Context(), "http://jellyfin.test", "api-key", "alice", "password")
+	user, err := client.CreateUser(t.Context(), "http://jellyfin.test", "api-key", "alice", "password", func(mediaserver.User) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}

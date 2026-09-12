@@ -44,3 +44,38 @@ func (s *Store) DeleteUserRecords(ctx context.Context, externalUserID string) er
 	}
 	return tx.Commit()
 }
+
+func (s *Store) UserDeletionRegistrations(ctx context.Context, id string) ([]Registration, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT `+registrationColumns+` FROM registrations WHERE external_user_id = ? ORDER BY id`, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var regs []Registration
+	for rows.Next() {
+		reg, err := scanRegistration(rows)
+		if err != nil {
+			return nil, err
+		}
+		if IsRegistrationActive(reg.Status) {
+			return nil, ErrRegistrationTransition
+		}
+		regs = append(regs, reg)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if len(regs) == 0 {
+		var tracked bool
+		if err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM managed_users WHERE external_user_id = ?)`, id).Scan(&tracked); err != nil {
+			return nil, err
+		}
+		if !tracked {
+			return nil, ErrNotFound
+		}
+	}
+	return regs, nil
+}

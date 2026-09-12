@@ -45,7 +45,7 @@ func TestInitSchemaRejectsPreV1Database(t *testing.T) {
 	}
 
 	err = store.InitSchema(context.Background())
-	if err == nil || !strings.Contains(err.Error(), "remove the database") {
+	if err == nil || !strings.Contains(err.Error(), "preserve the database") {
 		t.Fatalf("legacy database error = %v", err)
 	}
 }

@@ -149,10 +149,11 @@ func (s *Store) ReserveInviteUse(ctx context.Context, inviteID int64, ip, ua, us
 	result, err = tx.ExecContext(ctx, `
 		INSERT INTO registrations (
 			invite_id, username, status, template_name, template_policy_json,
-			ip_address, user_agent, created_at, updated_at
+			ip_address, user_agent, user_disable_at, created_at, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-	`, inviteID, username, RegistrationReserved, template.Name, template.PolicyJSON, ip, ua)
+		SELECT ?, ?, ?, ?, ?, ?, ?, CASE WHEN user_expiry_days > 0 THEN datetime(CURRENT_TIMESTAMP, '+' || user_expiry_days || ' days') END, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+		FROM invites WHERE id = ?
+	`, inviteID, username, RegistrationReserved, template.Name, template.PolicyJSON, ip, ua, inviteID)
 	if err != nil {
 		return 0, Template{}, err
 	}

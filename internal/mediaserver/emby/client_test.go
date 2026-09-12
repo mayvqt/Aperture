@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestClientUsesEmbyAuthorizationAndSetsPasswordSeparately(t *testing.T) {
@@ -46,7 +47,7 @@ func TestClientUsesEmbyAuthorizationAndSetsPasswordSeparately(t *testing.T) {
 		return nil, nil
 	})})
 
-	user, err := client.CreateUser(t.Context(), "http://emby.test", "api-key", "alice", "password")
+	user, err := client.CreateUser(t.Context(), "http://emby.test", "api-key", "alice", "password", func(mediaserver.User) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,32 +56,20 @@ func TestClientUsesEmbyAuthorizationAndSetsPasswordSeparately(t *testing.T) {
 	}
 }
 
-func TestPasswordFailureDisablesIncompleteAccount(t *testing.T) {
-	var disabled bool
+func TestPasswordFailureReturnsPersistedIncompleteAccount(t *testing.T) {
+	persisted := false
 	client := NewWithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/emby/Users/New":
-			return response(http.StatusOK, `{"Id":"user-1","Name":"alice"}`), nil
-		case r.Method == http.MethodPost && r.URL.Path == "/emby/Users/user-1/Password":
-			return response(http.StatusInternalServerError, ""), nil
-		case r.Method == http.MethodGet && r.URL.Path == "/emby/Users/user-1":
-			return response(http.StatusOK, `{"Policy":{"IsAdministrator":false}}`), nil
-		case r.Method == http.MethodPost && r.URL.Path == "/emby/Users/user-1/Policy":
-			var policy map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
-				t.Fatal(err)
-			}
-			disabled = policy["IsDisabled"] == true && policy["IsAdministrator"] == false
-			return response(http.StatusNoContent, ""), nil
-		default:
-			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		if r.URL.Path == "/emby/Users/New" {
+			return response(200, `{"Id":"user-1","Name":"alice"}`), nil
 		}
-		return nil, nil
+		if r.URL.Path != "/emby/Users/user-1/Password" || !persisted {
+			t.Fatalf("password request before durable ID: %s", r.URL.Path)
+		}
+		return response(500, ""), nil
 	})})
-
-	user, err := client.CreateUser(t.Context(), "http://emby.test", "api-key", "alice", "password")
-	if err == nil || user.ID != "user-1" || !disabled {
-		t.Fatalf("user = %#v, error = %v, disabled = %t", user, err, disabled)
+	user, err := client.CreateUser(t.Context(), "http://emby.test", "api-key", "alice", "password", func(u mediaserver.User) error { persisted = u.ID == "user-1"; return nil })
+	if err == nil || user.ID != "user-1" || !persisted {
+		t.Fatalf("user=%+v persisted=%v err=%v", user, persisted, err)
 	}
 }
 
@@ -97,40 +86,15 @@ func response(status int, body string) *http.Response {
 	}
 }
 
-func TestPasswordCancellationStillDisablesIncompleteAccount(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	disabled := false
+func TestPersistFailureStopsBeforePasswordSetup(t *testing.T) {
+	calls := 0
 	client := NewWithHTTPClient(&http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if err := r.Context().Err(); err != nil {
-			return nil, err
-		}
-		switch r.URL.Path {
-		case "/emby/Users/New":
-			return response(http.StatusOK, `{"Id":"partial-user","Name":"alice"}`), nil
-		case "/emby/Users/partial-user/Password":
-			cancel()
-			return nil, ctx.Err()
-		case "/emby/Users/partial-user":
-			deadline, ok := r.Context().Deadline()
-			if !ok || time.Until(deadline) > 10*time.Second {
-				t.Fatal("cleanup context is not bounded")
-			}
-			return response(http.StatusOK, `{"Policy":{"IsAdministrator":false}}`), nil
-		case "/emby/Users/partial-user/Policy":
-			var policy map[string]any
-			if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
-				t.Fatal(err)
-			}
-			disabled = policy["IsDisabled"] == true
-			return response(http.StatusNoContent, ""), nil
-		default:
-			t.Fatalf("unexpected cleanup target %s", r.URL.Path)
-			return nil, nil
-		}
+		calls++
+		return response(200, `{"Id":"partial-user","Name":"alice"}`), nil
 	})})
-	user, err := client.CreateUser(ctx, "http://emby.test", "api-key", "alice", "password")
-	if err == nil || user.ID != "partial-user" || !disabled {
-		t.Fatalf("password cancellation left incomplete account enabled: user=%q disabled=%t err=%v", user.ID, disabled, err)
+	persistErr := errors.New("store unavailable")
+	user, err := client.CreateUser(t.Context(), "http://emby.test", "api-key", "alice", "password", func(mediaserver.User) error { return persistErr })
+	if !errors.Is(err, persistErr) || user.ID != "partial-user" || calls != 1 {
+		t.Fatalf("user=%+v calls=%d err=%v", user, calls, err)
 	}
 }

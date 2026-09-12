@@ -34,7 +34,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, registrationID, "jf-alice"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationNeedsAttention, "policy failed", sql.NullTime{}); err != nil {
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationNeedsAttention, "policy failed"); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.UpdateTemplate(ctx, Template{
@@ -46,7 +46,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recovery, err := store.ClaimTemplateRecovery(ctx, registrationID)
+	recovery, err := store.ClaimTemplateRecovery(ctx, registrationID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	if recovery.UserExpiryDays != 7 || recovery.Registration.ExternalUserID.String != "jf-alice" {
 		t.Fatalf("recovery metadata = %#v", recovery)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, registrationID); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, registrationID, false); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("concurrent ClaimTemplateRecovery error = %v", err)
 	}
 	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET updated_at = datetime('now', '-1 hour') WHERE id = ?`, registrationID); err != nil {
@@ -69,15 +69,14 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	if reconciled.FlaggedAmbiguous != 1 {
 		t.Fatalf("retry reconciliation = %#v", reconciled)
 	}
-	recovery, err = store.ClaimTemplateRecovery(ctx, registrationID)
+	recovery, err = store.ClaimTemplateRecovery(ctx, registrationID, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	disableAt := sql.NullTime{Time: recovery.Registration.CreatedAt.AddDate(0, 0, recovery.UserExpiryDays), Valid: true}
-	if err := store.CompleteTemplateRecovery(ctx, registrationID, disableAt); err != nil {
+	if err := store.CompleteTemplateRecovery(ctx, registrationID); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteTemplateRecovery(ctx, registrationID, disableAt); !errors.Is(err, ErrRegistrationTransition) {
+	if err := store.CompleteTemplateRecovery(ctx, registrationID); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("second CompleteTemplateRecovery error = %v", err)
 	}
 }
@@ -156,7 +155,11 @@ func TestReconcileStaleRegistrationsReleasesOnlySafeReservations(t *testing.T) {
 		t.Fatalf("reserved status = %q", statuses[reservedID])
 	}
 	for _, id := range []int64{creatingID, applyingID, legacyID} {
-		if statuses[id] != RegistrationNeedsAttention {
+		want := RegistrationFailedCreateUser
+		if id == applyingID {
+			want = RegistrationNeedsAttention
+		}
+		if statuses[id] != want {
 			t.Fatalf("ambiguous registration %d status = %q", id, statuses[id])
 		}
 	}

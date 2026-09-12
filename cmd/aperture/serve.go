@@ -68,38 +68,45 @@ func serve(args []string) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	handler := httpserver.NewServer(cfg, store, media)
 	workerDone := make(chan struct{})
 	go func() {
 		defer close(workerDone)
-		httpserver.RunMaintenanceWorker(ctx, cfg, store, media)
+		handler.RunMaintenance(ctx)
 	}()
 
-	handler, waitForWebhooks := httpserver.NewWithShutdown(cfg, store, media)
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
+		WriteTimeout:      4 * time.Minute,
 		IdleTimeout:       120 * time.Second,
 		MaxHeaderBytes:    64 << 10,
 	}
 
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		handler.CloseAdmission()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Warn("HTTP shutdown deadline reached", "error", err)
+			_ = srv.Close()
+		}
 	}()
 
 	slog.Info("starting aperture", "addr", cfg.HTTPAddr, "db", cfg.DBPath)
 	err = srv.ListenAndServe()
 	stop()
+	<-shutdownDone
 	<-workerDone
-	deliveryCtx, cancelDeliveries := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelDeliveries()
-	if waitErr := waitForWebhooks(deliveryCtx); waitErr != nil {
-		slog.Warn("webhook deliveries did not finish before shutdown", "error", waitErr)
+	// Each accepted operation and webhook already has its own deadline. Closing
+	// SQLite after a separate drain timeout could race their final state writes.
+	if waitErr := handler.Drain(context.Background()); waitErr != nil {
+		return waitErr
 	}
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil

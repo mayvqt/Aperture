@@ -96,11 +96,11 @@
                         <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
                     </td>
                     <td>{{nullDate .UserDisableAt}}</td>
-                    <td>{{nullDateTime .NextDisableAttemptAt}}</td>
-                    <td><form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
+                    <td>{{registrationNextRetry .}}</td>
+                    <td>{{if not (registrationActive .Status)}}<form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}"><input name="return_to" type="hidden" value="/admin">
                         <button class="danger small">Remove</button>
-                    </form></td>
+                    </form>{{end}}</td>
                 </tr>
                 {{else}}
                 <tr>
@@ -190,20 +190,20 @@
                 <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
             </td>
             <td>{{.ExternalUserID.String}}</td>
-            <td><span class="cell-stack">Ends {{nullDate .UserDisableAt}}<small>Disabled {{nullDate .UserDisabledAt}}</small></span></td>
-            <td><span class="cell-stack">{{.DisableAttempts}} attempts<small>Next {{nullDateTime .NextDisableAttemptAt}}</small></span></td>
-			<td><span class="cell-stack">{{.TemplateAttempts}} attempts<small>Next {{nullDateTime .NextTemplateAttemptAt}}</small></span></td>
+            <td><span class="cell-stack">{{if .UserDisableAt.Valid}}Ends {{nullDate .UserDisableAt}}{{else}}No expiry{{end}}{{if .UserDisabledAt.Valid}}<small>Disabled {{nullDate .UserDisabledAt}}</small>{{end}}</span></td>
+            <td><span class="cell-stack">{{if .CleanupPending}}Disable pending{{else}}{{.DisableAttempts}} attempts{{end}}{{if .CleanupError.Valid}}<small>Last attempt failed</small>{{end}}{{if and .NextDisableAttemptAt.Valid (not .UserDisabledAt.Valid)}}<small>Next {{nullDateTime .NextDisableAttemptAt}}</small>{{end}}</span></td>
+			<td><span class="cell-stack">{{.TemplateAttempts}} attempts{{if canRetryTemplate .Status .ExternalUserID}}<small>{{if ge .TemplateAttempts 6}}Automatic retries finished; review access{{else if .NextTemplateAttemptAt.Valid}}Next {{nullDateTime .NextTemplateAttemptAt}}{{else}}Retry pending{{end}}</small>{{end}}</span></td>
             <td><div class="row-actions">{{if canRetryTemplate .Status .ExternalUserID}}
                 <form action="/admin/registrations/{{.ID}}/retry-template" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="small">Retry access</button>
                 </form>
                 {{end}}
-                <form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
+                {{if not (registrationActive .Status)}}<form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="danger small">Remove</button>
-                </form></div></td>
-            <td>{{.CreatedAt}}</td>
+                </form>{{end}}</div></td>
+            <td>{{dateTime .CreatedAt}}</td>
         </tr>
         {{else}}
         <tr>

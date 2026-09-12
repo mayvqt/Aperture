@@ -78,6 +78,10 @@ func (s *Store) ReconcileStaleRegistrations(ctx context.Context, staleBefore tim
 		}
 
 		message := "Registration was interrupted after media-server user creation may have begun."
+		status := RegistrationNeedsAttention
+		if reg.status == RegistrationCreatingUser || reg.status == RegistrationLegacyPending {
+			status = RegistrationFailedCreateUser
+		}
 		if reg.status == RegistrationApplyingTemplate || reg.status == RegistrationRetryingTemplate {
 			message = "Registration was interrupted after media-server user creation and before template application completed."
 		}
@@ -87,7 +91,7 @@ func (s *Store) ReconcileStaleRegistrations(ctx context.Context, staleBefore tim
 			    error_message = ?,
 			    updated_at = CURRENT_TIMESTAMP
 			WHERE id = ? AND status = ?
-		`, RegistrationNeedsAttention, message, reg.id, reg.status)
+		`, status, message, reg.id, reg.status)
 		if err != nil {
 			return ReconciliationResult{}, err
 		}
@@ -99,7 +103,7 @@ func (s *Store) ReconcileStaleRegistrations(ctx context.Context, staleBefore tim
 	return result, tx.Commit()
 }
 
-func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64) (RegistrationRecovery, error) {
+func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64, automatic bool) (RegistrationRecovery, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return RegistrationRecovery{}, err
@@ -117,6 +121,7 @@ func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64)
 		SELECT r.id, r.invite_id, r.external_user_id, r.username, r.status, r.error_message,
 		       r.user_disable_at, r.user_disabled_at,
 		       r.disable_attempts, r.next_disable_attempt_at, r.template_attempts, r.next_template_attempt_at, r.created_at, r.updated_at,
+		       r.cleanup_pending, r.cleanup_error,
 		       COALESCE(r.template_name, ''),
 		       COALESCE(r.template_policy_json, ''),
 		       i.user_expiry_days
@@ -134,9 +139,12 @@ func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64)
 		!CanRetryRegistrationTemplate(recovery.Registration.Status) {
 		return RegistrationRecovery{}, ErrRegistrationTransition
 	}
+	if automatic && (recovery.Registration.TemplateAttempts >= 6 || (recovery.Registration.NextTemplateAttemptAt.Valid && recovery.Registration.NextTemplateAttemptAt.Time.After(time.Now()))) {
+		return RegistrationRecovery{}, ErrRegistrationTransition
+	}
 	claimed, err := tx.ExecContext(ctx, `
 		UPDATE registrations
-		SET status = ?, updated_at = CURRENT_TIMESTAMP
+		SET status = ?, cleanup_pending = 1, cleanup_error = NULL, next_disable_attempt_at = NULL, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND external_user_id IS NOT NULL AND status IN (?, ?)
 	`, RegistrationRetryingTemplate, registrationID, RegistrationNeedsAttention, RegistrationFailedApplyTemplate)
 	if err != nil {
@@ -157,7 +165,7 @@ func (s *Store) RecordTemplateRetryFailure(ctx context.Context, registrationID i
 		UPDATE registrations
 		SET status = ?, error_message = NULLIF(?, ''),
 		    template_attempts = template_attempts + 1,
-		    next_template_attempt_at = datetime(CURRENT_TIMESTAMP, '+' || CASE WHEN template_attempts >= 5 THEN 360 ELSE (1 << template_attempts) END || ' minutes'),
+		    next_template_attempt_at = CASE WHEN template_attempts < 5 THEN datetime(CURRENT_TIMESTAMP, '+' || (1 << template_attempts) || ' minutes') END,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND external_user_id IS NOT NULL
@@ -169,16 +177,17 @@ func (s *Store) RecordTemplateRetryFailure(ctx context.Context, registrationID i
 	return requireSingleTransition(result)
 }
 
-func (s *Store) CompleteTemplateRecovery(ctx context.Context, registrationID int64, disableAt sql.NullTime) error {
+func (s *Store) CompleteTemplateRecovery(ctx context.Context, registrationID int64) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
 		SET status = ?, error_message = NULL, next_template_attempt_at = NULL,
-		    user_disable_at = ?, next_disable_attempt_at = ?,
+		    cleanup_pending = 0, cleanup_error = NULL, user_disabled_at = NULL, next_disable_attempt_at = user_disable_at,
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND external_user_id IS NOT NULL
 		  AND status = ?
-	`, RegistrationComplete, disableAt, disableAt, registrationID, RegistrationRetryingTemplate)
+		  AND (user_disable_at IS NULL OR user_disable_at > CURRENT_TIMESTAMP)
+	`, RegistrationComplete, registrationID, RegistrationRetryingTemplate)
 	if err != nil {
 		return err
 	}

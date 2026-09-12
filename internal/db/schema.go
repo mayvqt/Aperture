@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-const schemaRevision = 4
+const schemaRevision = 5
 
 const schema = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -143,7 +143,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 			return fmt.Errorf("inspect database schema: %w", err)
 		}
 		if tables != 0 {
-			return fmt.Errorf("unsupported database schema; remove the database and restart Aperture")
+			return fmt.Errorf("unsupported database schema; preserve the database and restore a supported backup before restarting Aperture")
 		}
 	}
 
@@ -193,6 +193,11 @@ func (s *Store) InitSchema(ctx context.Context) error {
 	if _, err := tx.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("create schema: %w", err)
 	}
+	if revision < 5 {
+		if err := migrateAccountCleanup(ctx, tx); err != nil {
+			return err
+		}
+	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO templates (name, description, policy_json, is_default, created_at, updated_at)
 		SELECT 'Default', 'Restricted default template', '{"IsAdministrator":false}', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -200,7 +205,7 @@ func (s *Store) InitSchema(ctx context.Context) error {
 	`); err != nil {
 		return fmt.Errorf("seed default template: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 4`); err != nil {
+	if _, err := tx.ExecContext(ctx, `PRAGMA user_version = 5`); err != nil {
 		return fmt.Errorf("record schema revision: %w", err)
 	}
 	if err := tx.Commit(); err != nil {

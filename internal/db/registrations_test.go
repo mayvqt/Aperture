@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -39,10 +38,16 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, futureRegID, "jellyfin-bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, dueRegID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(-time.Hour).UTC(), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(-time.Hour).UTC(), time.Now().Add(-time.Hour).UTC(), dueRegID); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, futureRegID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(time.Hour).UTC(), Valid: true}); err != nil {
+	if err := store.CompleteRegistration(ctx, dueRegID, RegistrationComplete, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(time.Hour).UTC(), time.Now().Add(time.Hour).UTC(), futureRegID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, futureRegID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,6 +83,15 @@ func TestDeleteRegistrationRemovesOnlyTheHistoryRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := store.DeleteRegistration(ctx, registrationID); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("deleted active reservation: %v", err)
+	}
+	if err := store.BeginUserCreation(ctx, registrationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.FailUserCreation(ctx, registrationID, "creation rejected"); err != nil {
+		t.Fatal(err)
+	}
 	if err := store.DeleteRegistration(ctx, registrationID); err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +123,10 @@ func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, registrationID, "jf-alice"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(-time.Hour).UTC(), time.Now().Add(-time.Hour).UTC(), registrationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 	before := time.Now().UTC()
@@ -152,10 +169,10 @@ func TestCompleteRegistrationRejectsRepeatedTransition(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, registrationID, "jf-alice"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{}); err != nil {
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{}); !errors.Is(err, ErrRegistrationTransition) {
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("second CompleteRegistration error = %v, want ErrRegistrationTransition", err)
 	}
 }
@@ -246,10 +263,13 @@ func TestDashboardCountsCoverFullHistory(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, scheduledID, "jf-bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, attentionID, RegistrationNeedsAttention, "policy failed", sql.NullTime{}); err != nil {
+	if err := store.CompleteRegistration(ctx, attentionID, RegistrationNeedsAttention, "policy failed"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, scheduledID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(time.Hour), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(time.Hour).UTC(), time.Now().Add(time.Hour).UTC(), scheduledID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, scheduledID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -291,10 +311,10 @@ func TestPartialUserCreationCannotRetryTemplate(t *testing.T) {
 	if registration.Status != RegistrationFailedCreateUser || registration.ExternalUserID.String != "partial-user" {
 		t.Fatalf("partial account was not durably isolated: status=%q id=%q", registration.Status, registration.ExternalUserID.String)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, id); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, id, false); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("partial account allowed manual template retry: %v", err)
 	}
-	if due, err := store.DueTemplateRecoveries(ctx, 10); err != nil || len(due) != 0 {
+	if due, err := store.ListDueTemplateRecoveryIDs(ctx, 10); err != nil || len(due) != 0 {
 		t.Fatalf("partial account allowed automatic template retry: count=%d err=%v", len(due), err)
 	}
 	if err := store.RecordFailedUserCreation(ctx, id, "other-user", "replacement"); !errors.Is(err, ErrRegistrationTransition) {

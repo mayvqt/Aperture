@@ -20,3 +20,15 @@ and use a compatible Aperture version; never delete the database as a normal upg
 
 Admins can configure Discord or generic JSON webhooks, events, and optional Discord role IDs in the web UI. URLs are
 encrypted. Failed template application is retried automatically up to six times.
+
+## Account recovery
+
+Registrations show access retries and pending disables separately. After six
+automatic access retries, review the account and use **Retry access** when ready.
+Failed disables keep retrying with backoff until the account is disabled or no
+longer exists. Password-incomplete accounts require administrator review and
+cannot be enabled by retrying a template.
+
+An account's expiry is fixed when its invite use is reserved. Recovery never
+extends it, and an expired account can only be disabled. Accounts undergoing
+creation or recovery cannot be removed until that operation finishes.

@@ -219,6 +219,9 @@ func (f *fakeStore) ReserveInviteUse(context.Context, int64, string, string, str
 		return 0, db.Template{}, f.templateErr
 	}
 	f.reservedInviteUse = true
+	if f.invite.UserExpiryDays > 0 {
+		f.completedDisableAt = sql.NullTime{Time: time.Now().AddDate(0, 0, f.invite.UserExpiryDays), Valid: true}
+	}
 	return 123, f.template, nil
 }
 func (f *fakeStore) BeginUserCreation(context.Context, int64) error {
@@ -241,9 +244,8 @@ func (f *fakeStore) RecordCreatedUser(_ context.Context, _ int64, userID string)
 	f.recordedUserID = userID
 	return nil
 }
-func (f *fakeStore) CompleteRegistration(_ context.Context, _ int64, status string, _ string, disableAt sql.NullTime) error {
+func (f *fakeStore) CompleteRegistration(_ context.Context, _ int64, status string, _ string) error {
 	f.completedStatus = status
-	f.completedDisableAt = disableAt
 	return nil
 }
 func (f *fakeStore) ReconcileStaleRegistrations(context.Context, time.Time, int) (db.ReconciliationResult, error) {
@@ -273,7 +275,7 @@ func (f *fakeStore) RegistrationUsers(context.Context) ([]db.Registration, error
 	return f.registrations, nil
 }
 func (f *fakeStore) Registration(_ context.Context, id int64) (db.Registration, error) {
-	for _, registration := range f.registrations {
+	for _, registration := range append(append([]db.Registration{}, f.registrations...), f.dueDisables...) {
 		if registration.ID == id {
 			return registration, nil
 		}
@@ -310,7 +312,7 @@ func (f *fakeStore) DeleteUserRecords(_ context.Context, id string) error {
 	}
 	return nil
 }
-func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error) {
+func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64, bool) (db.RegistrationRecovery, error) {
 	recovery := f.recovery
 	recovery.Registration.Status = db.RegistrationRetryingTemplate
 	return recovery, nil
@@ -319,7 +321,7 @@ func (f *fakeStore) RecordTemplateRetryFailure(_ context.Context, _ int64, messa
 	f.recoveryFailure = message
 	return nil
 }
-func (f *fakeStore) CompleteTemplateRecovery(context.Context, int64, sql.NullTime) error {
+func (f *fakeStore) CompleteTemplateRecovery(context.Context, int64) error {
 	f.recoveryCompleted = true
 	return nil
 }
@@ -357,8 +359,41 @@ func (f *fakeStore) DeleteWebhook(_ context.Context, id int64) error {
 	}
 	return db.ErrNotFound
 }
-func (f *fakeStore) DueTemplateRecoveries(context.Context, int) ([]db.RegistrationRecovery, error) {
-	return f.dueTemplateRetries, nil
+func (f *fakeStore) ListDueTemplateRecoveryIDs(context.Context, int) ([]int64, error) {
+	var ids []int64
+	for _, r := range f.dueTemplateRetries {
+		ids = append(ids, r.Registration.ID)
+	}
+	return ids, nil
 }
 
 var _ Store = (*fakeStore)(nil)
+
+func (f *fakeStore) RecordProvisioningUser(_ context.Context, _ int64, id string) error {
+	f.recordedUserID = id
+	return nil
+}
+func (f *fakeStore) RequireAccountCleanup(_ context.Context, _ int64, id string) error {
+	f.recordedUserID = id
+	return nil
+}
+func (f *fakeStore) UserDeletionRegistrations(_ context.Context, id string) ([]db.Registration, error) {
+	var regs []db.Registration
+	for _, r := range f.registrations {
+		if r.ExternalUserID.String == id {
+			if db.IsRegistrationActive(r.Status) {
+				return nil, db.ErrRegistrationTransition
+			}
+			regs = append(regs, r)
+		}
+	}
+	if len(regs) > 0 {
+		return regs, nil
+	}
+	for _, u := range f.managedUsers {
+		if u.ExternalUserID == id {
+			return nil, nil
+		}
+	}
+	return nil, db.ErrNotFound
+}

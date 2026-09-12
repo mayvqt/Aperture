@@ -97,19 +97,6 @@ type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
 
-func TestDisableAtFor(t *testing.T) {
-	if got := disableAtFor(0); got.Valid {
-		t.Fatalf("disableAtFor(0) = %#v, want invalid", got)
-	}
-	got := disableAtFor(2)
-	if !got.Valid {
-		t.Fatal("disableAtFor(2) should be valid")
-	}
-	if days := int(time.Until(got.Time).Hours() / 24); days < 1 || days > 2 {
-		t.Fatalf("disableAtFor(2) is about %d days away, want about 2", days)
-	}
-}
-
 func TestDashboardStatsFrom(t *testing.T) {
 	now := time.Now()
 	stats := dashboardStatsFrom([]db.Invite{

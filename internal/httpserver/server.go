@@ -35,6 +35,12 @@ type Server struct {
 	runtimePublicURL string
 	cookieSecure     bool
 	webhookWG        sync.WaitGroup
+	accountMu        sync.Mutex
+	activeAccounts   map[int64]bool
+	accountWG        sync.WaitGroup
+	httpWG           sync.WaitGroup
+	closing          bool
+	handler          http.Handler
 }
 
 func New(cfg config.Config, store Store, media MediaServer) http.Handler {
@@ -45,6 +51,12 @@ func New(cfg config.Config, store Store, media MediaServer) http.Handler {
 // NewWithShutdown returns the HTTP handler and a function that waits for
 // accepted webhook deliveries to finish during graceful shutdown.
 func NewWithShutdown(cfg config.Config, store Store, media MediaServer) (http.Handler, func(context.Context) error) {
+	s := NewServer(cfg, store, media)
+	return s, s.Drain
+}
+
+// NewServer owns HTTP, maintenance and accepted background deliveries together.
+func NewServer(cfg config.Config, store Store, media MediaServer) *Server {
 	s := &Server{
 		cfg:              cfg,
 		store:            store,
@@ -59,7 +71,40 @@ func NewWithShutdown(cfg config.Config, store Store, media MediaServer) (http.Ha
 		cookieSecure:     cfg.CookieSecure,
 	}
 	s.routes()
-	return s.securityHeaders(s.mux), s.waitForWebhooks
+	s.handler = s.securityHeaders(s.mux)
+	return s
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.accountMu.Lock()
+	if s.closing {
+		s.accountMu.Unlock()
+		http.Error(w, "Aperture is restarting. Try again shortly.", http.StatusServiceUnavailable)
+		return
+	}
+	s.httpWG.Add(1)
+	s.accountMu.Unlock()
+	defer s.httpWG.Done()
+	s.handler.ServeHTTP(w, r)
+}
+
+func (s *Server) CloseAdmission() {
+	s.accountMu.Lock()
+	s.closing = true
+	s.accountMu.Unlock()
+}
+
+// Drain is called after the HTTP server and maintenance stop accepting work.
+func (s *Server) Drain(ctx context.Context) error {
+	s.CloseAdmission()
+	done := make(chan struct{})
+	go func() { s.httpWG.Wait(); s.accountWG.Wait(); close(done) }()
+	select {
+	case <-done:
+		return s.waitForWebhooks(ctx)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *Server) waitForWebhooks(ctx context.Context) error {
@@ -91,14 +136,12 @@ func (s *Server) runtimeSettings() (provider, publicURL string, cookieSecure boo
 	return s.provider, s.runtimePublicURL, s.cookieSecure
 }
 
-func RunMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, media MediaServer) {
-	runMaintenanceWorker(ctx, cfg, store, media, maintenanceInterval)
-}
-
-func runMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, media MediaServer, interval time.Duration) {
-	s := &Server{cfg: cfg, store: store, media: media}
+func (s *Server) RunMaintenance(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	s.runMaintenance(ctx)
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(maintenanceInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -112,8 +155,8 @@ func runMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, m
 
 func (s *Server) runMaintenance(ctx context.Context) {
 	s.reconcileAndLogStaleRegistrations(ctx)
-	s.processDueTemplateRetries(ctx)
 	s.processAndLogDueUserDisables(ctx)
+	s.processDueTemplateRetries(ctx)
 	s.pruneAuditLog(ctx)
 }
 

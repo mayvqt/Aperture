@@ -62,12 +62,12 @@ func (f *fakeMediaServer) Ping(_ context.Context, _, apiKey string) error {
 	}
 	return nil
 }
-func (f *fakeMediaServer) CreateUser(context.Context, string, string, string, string) (mediaserver.User, error) {
+func (f *fakeMediaServer) CreateUser(_ context.Context, _, _, _, _ string, created func(mediaserver.User) error) (mediaserver.User, error) {
 	f.createdUser = true
 	if f.createErr != nil {
 		return mediaserver.User{}, f.createErr
 	}
-	return mediaserver.User{ID: "new-media-user", Name: "new_user"}, nil
+	return mediaserver.User{ID: "new-media-user", Name: "new_user"}, created(mediaserver.User{ID: "new-media-user", Name: "new_user"})
 }
 func (f *fakeMediaServer) ApplyTemplate(_ context.Context, _, _, userID string, template db.Template) error {
 	f.appliedTemplate = true

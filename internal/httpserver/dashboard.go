@@ -2,9 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"database/sql"
 	"log/slog"
-	"strconv"
 	"strings"
 	"time"
 
@@ -98,16 +96,6 @@ func (s *Server) dashboardHealth(ctx context.Context, settings db.Settings, coun
 	return checks
 }
 
-func disableAtFor(days int) sql.NullTime {
-	return disableAtFrom(time.Now(), days)
-}
-
-func disableAtFrom(createdAt time.Time, days int) sql.NullTime {
-	if days <= 0 {
-		return sql.NullTime{}
-	}
-	return sql.NullTime{Time: createdAt.AddDate(0, 0, days).UTC(), Valid: true}
-}
 func (s *Server) processDueUserDisables(ctx context.Context) int {
 	settings, err := s.settings(ctx)
 	if err != nil || settings.ServerURL == "" || settings.APIKey == "" {
@@ -120,23 +108,25 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 	}
 	disabled := 0
 	for _, reg := range regs {
-		if !reg.ExternalUserID.Valid {
+		if ctx.Err() != nil {
+			break
+		}
+		release, err := s.claimAccountOperations(reg.ID)
+		if err != nil {
 			continue
 		}
-		if err := s.media.DisableUser(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String); err != nil {
-			if recordErr := s.store.MarkUserDisableFailed(ctx, reg.ID, safeError(err)); recordErr != nil {
-				slog.Error("could not record media-server user disable failure", "registration_id", reg.ID, "error", safeError(recordErr))
-			}
-			slog.Warn("media-server user disable failed", "registration_id", reg.ID, "error", safeError(err))
-			s.notify(webhookNotice{Event: "user.disable_failed", Title: "Expired user disable failed", Description: "Aperture will retry automatically.", Color: 0xe67e22, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Error": safeError(err)}})
+		current, err := s.store.Registration(ctx, reg.ID)
+		if err != nil || !current.NeedsDisable(time.Now()) {
+			release()
 			continue
 		}
-		if err := s.store.MarkUserDisabled(ctx, reg.ID); err != nil {
-			slog.Warn("could not mark media-server user disabled", "registration_id", reg.ID, "error", safeError(err))
+		err = s.disableAccount(ctx, settings, current)
+		release()
+		if err != nil {
+			slog.Warn("media-server user disable will retry", "registration_id", reg.ID, "error", safeError(err))
 			continue
 		}
 		disabled++
-		s.notify(webhookNotice{Event: "user.disabled", Title: "Expired user disabled", Color: 0x2ecc71, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10)}})
 	}
 	return disabled
 }
@@ -146,22 +136,17 @@ func (s *Server) processDueTemplateRetries(ctx context.Context) {
 	if err != nil || settings.ServerURL == "" || settings.APIKey == "" {
 		return
 	}
-	recoveries, err := s.store.DueTemplateRecoveries(ctx, 10)
+	ids, err := s.store.ListDueTemplateRecoveryIDs(ctx, 10)
 	if err != nil {
-		slog.Warn("could not claim template retries", "error", safeError(err))
+		slog.Warn("could not list template retries", "error", safeError(err))
 		return
 	}
-	for _, recovery := range recoveries {
-		reg := recovery.Registration
-		if err := s.media.ApplyTemplate(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String, recovery.Template); err != nil {
-			_ = s.store.RecordTemplateRetryFailure(ctx, reg.ID, safeError(err))
-			s.notify(webhookNotice{Event: "template.failed", Title: "Template retry failed", Description: "Aperture will retry with bounded backoff.", Color: 0xe67e22, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Attempt": strconv.Itoa(reg.TemplateAttempts + 1), "Error": safeError(err)}})
-			continue
+	for _, id := range ids {
+		if ctx.Err() != nil {
+			return
 		}
-		if err := s.store.CompleteTemplateRecovery(ctx, reg.ID, disableAtFrom(reg.CreatedAt, recovery.UserExpiryDays)); err != nil {
-			slog.Warn("could not complete automatic template recovery", "registration_id", reg.ID, "error", safeError(err))
-			continue
+		if err := s.recoverAccount(ctx, settings, id, true); err != nil {
+			slog.Warn("template recovery did not complete", "registration_id", id, "error", safeError(err))
 		}
-		s.notify(webhookNotice{Event: "template.recovered", Title: "Access template recovered", Color: 0x2ecc71, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10), "Template": recovery.Template.Name}})
 	}
 }

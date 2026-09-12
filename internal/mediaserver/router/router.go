@@ -63,8 +63,8 @@ func (s *Server) IsAdmin(ctx context.Context, baseURL, token, deviceID, userID s
 func (s *Server) Ping(ctx context.Context, baseURL, apiKey string) error {
 	return s.current().Ping(ctx, baseURL, apiKey)
 }
-func (s *Server) CreateUser(ctx context.Context, baseURL, apiKey, username, password string) (mediaserver.User, error) {
-	return s.current().CreateUser(ctx, baseURL, apiKey, username, password)
+func (s *Server) CreateUser(ctx context.Context, baseURL, apiKey, username, password string, created func(mediaserver.User) error) (mediaserver.User, error) {
+	return s.current().CreateUser(ctx, baseURL, apiKey, username, password, created)
 }
 func (s *Server) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID string, tmpl db.Template) error {
 	return s.current().ApplyTemplate(ctx, baseURL, apiKey, userID, tmpl)

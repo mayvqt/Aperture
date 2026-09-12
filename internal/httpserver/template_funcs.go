@@ -18,6 +18,25 @@ type templateSummaryItem struct {
 }
 
 var templateFuncs = template.FuncMap{
+	"registrationActive": db.IsRegistrationActive,
+	"registrationNextRetry": func(reg db.Registration) string {
+		if reg.CleanupPending || reg.Status == db.RegistrationDisableFailed {
+			if reg.NextDisableAttemptAt.Valid {
+				return reg.NextDisableAttemptAt.Time.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			return "Disable pending"
+		}
+		if db.CanRetryRegistrationTemplate(reg.Status) {
+			if reg.TemplateAttempts >= 6 {
+				return "Review needed"
+			}
+			if reg.NextTemplateAttemptAt.Valid {
+				return reg.NextTemplateAttemptAt.Time.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			return "Access retry pending"
+		}
+		return "—"
+	},
 	"stylesheetHash": func() string { return stylesheetHash },
 	"scriptHash":     func() string { return scriptHash },
 	"boolText": func(v bool) string {
@@ -48,7 +67,7 @@ var templateFuncs = template.FuncMap{
 		case db.RegistrationNeedsAttention, db.RegistrationFailedApplyTemplate:
 			return "Review needed"
 		case db.RegistrationFailedCreateUser:
-			return "Account not created"
+			return "Setup incomplete"
 		case db.RegistrationDisableFailed:
 			return "Could not disable"
 		case db.RegistrationDisabledExpired:

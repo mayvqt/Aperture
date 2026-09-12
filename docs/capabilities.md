@@ -6,7 +6,7 @@ Aperture provides:
 - administrator authentication through the configured media server;
 - reusable non-administrator policy templates that preserve target authentication defaults, including import from an existing user;
 - bounded, expiring invite links with usage limits and optional account expiry;
-- account creation, policy application, retry, disable, and recovery workflows;
+- account creation, policy application, retry, disable, and recovery workflows with durable incomplete-account cleanup;
 - managed-user and registration history views;
 - Discord and generic JSON webhooks with selected events; and
 - administrative audit history with bounded retention.

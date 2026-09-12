@@ -20,6 +20,11 @@ Media-server policy fixtures cover complete target defaults, case-insensitive
 overrides, duplicate access flags, and disabling an account after an ambiguous
 failure. Keep these checks when changing template import or application.
 
+Account lifecycle regressions cover interrupted password setup, lost policy and
+completion responses, exhausted template retries with pending cleanup, fixed
+expiry, operation collisions, and fresh/legacy/rollback migration behavior with
+encrypted-value preservation.
+
 ## UI evidence
 
 Rebuild before visual checks because templates, CSS, and JavaScript are embedded.

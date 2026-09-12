@@ -6,7 +6,20 @@ import (
 	"errors"
 )
 
-const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at`
+const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at, cleanup_pending, cleanup_error`
+
+// RecordProvisioningUser is called before a second provider request can begin.
+// Password setup is still incomplete and template recovery remains forbidden.
+func (s *Store) RecordProvisioningUser(ctx context.Context, id int64, userID string) error {
+	if userID == "" {
+		return ErrRegistrationTransition
+	}
+	result, err := s.db.ExecContext(ctx, `UPDATE registrations SET external_user_id = ?, cleanup_pending = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = ?`, userID, id, RegistrationCreatingUser)
+	if err != nil {
+		return err
+	}
+	return requireSingleTransition(result)
+}
 
 func (s *Store) FailUserCreation(ctx context.Context, registrationID int64, message string) error {
 	result, err := s.db.ExecContext(ctx, `
@@ -28,7 +41,7 @@ func (s *Store) RecordFailedUserCreation(ctx context.Context, registrationID int
 	}
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET external_user_id = ?, status = ?, error_message = NULLIF(?, ''), updated_at = CURRENT_TIMESTAMP
+		SET external_user_id = ?, status = ?, error_message = NULLIF(?, ''), cleanup_pending = 1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND status = ?
 	`, externalUserID, RegistrationFailedCreateUser, message, registrationID, RegistrationCreatingUser)
 	if err != nil {
@@ -43,7 +56,7 @@ func (s *Store) RecordCreatedUser(ctx context.Context, registrationID int64, ext
 	}
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET external_user_id = ?, status = ?, error_message = NULL, updated_at = CURRENT_TIMESTAMP
+		SET external_user_id = ?, status = ?, error_message = NULL, cleanup_pending = 1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND status = ?
 	`, externalUserID, RegistrationApplyingTemplate, registrationID, RegistrationCreatingUser)
 	if err != nil {
@@ -52,16 +65,17 @@ func (s *Store) RecordCreatedUser(ctx context.Context, registrationID int64, ext
 	return requireSingleTransition(result)
 }
 
-func (s *Store) CompleteRegistration(ctx context.Context, registrationID int64, status, message string, disableAt sql.NullTime) error {
+func (s *Store) CompleteRegistration(ctx context.Context, registrationID int64, status, message string) error {
 	if status != RegistrationComplete && status != RegistrationNeedsAttention {
 		return ErrRegistrationTransition
 	}
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
 		SET status = ?, error_message = NULLIF(?, ''),
-		    user_disable_at = ?, next_disable_attempt_at = ?, updated_at = CURRENT_TIMESTAMP
+		    cleanup_pending = CASE WHEN ? = 'complete' THEN 0 ELSE 1 END,
+		    cleanup_error = NULL, next_disable_attempt_at = CASE WHEN ? = 'complete' THEN user_disable_at END, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ? AND status = ?
-	`, status, message, disableAt, disableAt, registrationID, RegistrationApplyingTemplate)
+	`, status, message, status, status, registrationID, RegistrationApplyingTemplate)
 	if err != nil {
 		return err
 	}
@@ -73,9 +87,8 @@ func (s *Store) DueUserDisables(ctx context.Context, limit int) ([]Registration,
 		SELECT `+registrationColumns+`
 		FROM registrations
 		WHERE external_user_id IS NOT NULL
-		  AND user_disable_at IS NOT NULL
-		  AND user_disable_at <= CURRENT_TIMESTAMP
-		  AND user_disabled_at IS NULL
+		  AND (cleanup_pending = 1 OR (user_disable_at <= CURRENT_TIMESTAMP AND user_disabled_at IS NULL))
+		  AND status NOT IN ('reserved','creating_user','applying_template','retrying_template','pending')
 		  AND (next_disable_attempt_at IS NULL OR next_disable_attempt_at <= CURRENT_TIMESTAMP)
 		ORDER BY next_disable_attempt_at ASC, user_disable_at ASC
 		LIMIT ?
@@ -97,12 +110,13 @@ func (s *Store) DueUserDisables(ctx context.Context, limit int) ([]Registration,
 func (s *Store) MarkUserDisabled(ctx context.Context, registrationID int64) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET user_disabled_at = CURRENT_TIMESTAMP, status = ?,
-		    error_message = NULL, next_disable_attempt_at = NULL, updated_at = CURRENT_TIMESTAMP
+		SET user_disabled_at = CASE WHEN user_disable_at <= CURRENT_TIMESTAMP THEN CURRENT_TIMESTAMP ELSE user_disabled_at END,
+		    status = CASE WHEN user_disable_at <= CURRENT_TIMESTAMP THEN ? ELSE status END,
+		    cleanup_pending = 0, cleanup_error = NULL,
+		    next_disable_attempt_at = user_disable_at, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND external_user_id IS NOT NULL
-		  AND user_disable_at IS NOT NULL
-		  AND user_disabled_at IS NULL
+		  AND (cleanup_pending = 1 OR (user_disable_at <= CURRENT_TIMESTAMP AND user_disabled_at IS NULL))
 	`, RegistrationDisabledExpired, registrationID)
 	if err != nil {
 		return err
@@ -112,21 +126,20 @@ func (s *Store) MarkUserDisabled(ctx context.Context, registrationID int64) erro
 func (s *Store) MarkUserDisableFailed(ctx context.Context, registrationID int64, message string) error {
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE registrations
-		SET status = ?,
-		    error_message = NULLIF(?, ''),
+		SET status = CASE WHEN user_disable_at <= CURRENT_TIMESTAMP THEN ? ELSE status END,
+		    cleanup_error = NULLIF(?, ''),
 		    disable_attempts = disable_attempts + 1,
-		    next_disable_attempt_at = datetime(
+		    next_disable_attempt_at = MIN(datetime(
 		        CURRENT_TIMESTAMP,
 		        '+' || CASE
 		            WHEN disable_attempts >= 9 THEN 360
 		            ELSE (1 << disable_attempts)
 		        END || ' minutes'
-		    ),
+		    ), COALESCE(CASE WHEN user_disable_at > CURRENT_TIMESTAMP THEN user_disable_at END, '9999-12-31 23:59:59')),
 		    updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 		  AND external_user_id IS NOT NULL
-		  AND user_disable_at IS NOT NULL
-		  AND user_disabled_at IS NULL
+		  AND (cleanup_pending = 1 OR (user_disable_at <= CURRENT_TIMESTAMP AND user_disabled_at IS NULL))
 	`, RegistrationDisableFailed, message, registrationID)
 	if err != nil {
 		return err
@@ -195,7 +208,7 @@ func (s *Store) Registration(ctx context.Context, id int64) (Registration, error
 }
 
 func (s *Store) DeleteRegistration(ctx context.Context, id int64) error {
-	result, err := s.db.ExecContext(ctx, `DELETE FROM registrations WHERE id = ?`, id)
+	result, err := s.db.ExecContext(ctx, `DELETE FROM registrations WHERE id = ? AND external_user_id IS NULL AND status NOT IN ('reserved','creating_user','applying_template','retrying_template','pending')`, id)
 	if err != nil {
 		return err
 	}
@@ -204,7 +217,7 @@ func (s *Store) DeleteRegistration(ctx context.Context, id int64) error {
 		return err
 	}
 	if changed != 1 {
-		return ErrNotFound
+		return ErrRegistrationTransition
 	}
 	return nil
 }
@@ -284,6 +297,8 @@ func registrationScanDestinations(reg *Registration) []any {
 		&reg.NextTemplateAttemptAt,
 		&reg.CreatedAt,
 		&reg.UpdatedAt,
+		&reg.CleanupPending,
+		&reg.CleanupError,
 	}
 }
 

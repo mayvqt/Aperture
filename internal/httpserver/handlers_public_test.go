@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -255,14 +254,14 @@ func (s *provisioningStore) RecordCreatedUser(ctx context.Context, id int64, use
 	return s.fakeStore.RecordCreatedUser(ctx, id, userID)
 }
 
-func (s *provisioningStore) CompleteRegistration(ctx context.Context, id int64, status, message string, expiry sql.NullTime) error {
+func (s *provisioningStore) CompleteRegistration(ctx context.Context, id int64, status, message string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if s.completeError != nil {
 		return s.completeError
 	}
-	return s.fakeStore.CompleteRegistration(ctx, id, status, message, expiry)
+	return s.fakeStore.CompleteRegistration(ctx, id, status, message)
 }
 
 type provisioningMedia struct {
@@ -271,8 +270,8 @@ type provisioningMedia struct {
 	partialError error
 }
 
-func (m *provisioningMedia) CreateUser(ctx context.Context, baseURL, key, username, password string) (mediaserver.User, error) {
-	user, err := m.fakeMediaServer.CreateUser(ctx, baseURL, key, username, password)
+func (m *provisioningMedia) CreateUser(ctx context.Context, baseURL, key, username, password string, created func(mediaserver.User) error) (mediaserver.User, error) {
+	user, err := m.fakeMediaServer.CreateUser(ctx, baseURL, key, username, password, created)
 	if m.cancel != nil {
 		m.cancel()
 	}

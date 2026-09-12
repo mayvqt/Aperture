@@ -31,3 +31,9 @@ Every schema change requires:
 
 Never repair an upgrade by deleting the database. Back up and restore the whole
 state set as described in [Operations](operations.md).
+
+Revision 5 adds durable account cleanup state. Expiry is captured in the invite
+reservation transaction and retained through failures and recovery. Migration
+preserves existing deadlines and reconstructs missing finite deadlines from the
+original registration time and retained invite duration. Incomplete accounts
+with known upstream IDs enter cleanup independently of access retry attempts.
