@@ -23,6 +23,8 @@ type fakeMediaServer struct {
 	applyErr        error
 	importErr       error
 	pingErr         error
+	inspectErr      error
+	inspectAPIKey   atomic.Value
 	pingCalls       atomic.Int32
 	pingStarted     chan struct{}
 	pingRelease     chan struct{}
@@ -34,9 +36,12 @@ type fakeMediaServer struct {
 	disableErr      error
 }
 
-func (f *fakeMediaServer) SetProvider(provider mediaserver.Provider) error {
-	f.provider = provider
-	return nil
+func (f *fakeMediaServer) Inspect(ctx context.Context, baseURL, token, deviceID string) (mediaserver.ServerInfo, error) {
+	f.inspectAPIKey.Store(token)
+	if err := f.inspectErr; err != nil && deviceID == "aperture" {
+		return mediaserver.ServerInfo{}, err
+	}
+	return mediaserver.ServerInfo{ID: "synthetic-server", Name: "Media"}, nil
 }
 
 func (f *fakeMediaServer) Authenticate(context.Context, string, string, string) (mediaserver.AuthResult, error) {
@@ -101,6 +106,6 @@ func (f *fakeMediaServer) ImportTemplate(context.Context, string, string, string
 	return mediaserver.TemplateData{PolicyJSON: db.TemplatePolicyDefaultJSON}, nil
 }
 
-var _ MediaServer = (*fakeMediaServer)(nil)
+var _ mediaserver.Server = (*fakeMediaServer)(nil)
 
 var errFakePing = errors.New("ping failed")

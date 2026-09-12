@@ -11,10 +11,10 @@ import (
 
 func TestMaintenanceWorkerReconcilesAndProcessesExpiryImmediately(t *testing.T) {
 	store := newFakeStore()
-	store.dueDisables = []db.Registration{{ID: 42, CleanupPending: true, ExternalUserID: sql.NullString{String: "expired-user", Valid: true}}}
+	store.dueDisables = []db.Registration{{BindingID: 1, ID: 42, CleanupPending: true, ExternalUserID: sql.NullString{String: "expired-user", Valid: true}}}
 	media := &fakeMediaServer{}
 	ctx := context.Background()
-	s := NewServer(testConfig(), store, media)
+	s := NewServer(testConfig(), store, testMediaFactory(media))
 	s.runMaintenance(ctx)
 	if !store.reconciledStale {
 		t.Fatal("maintenance worker did not reconcile stale registrations")
@@ -32,10 +32,10 @@ func TestMaintenanceWorkerReconcilesAndProcessesExpiryImmediately(t *testing.T) 
 
 func TestMaintenanceWorkerRecordsExpiredUserDisableFailure(t *testing.T) {
 	store := newFakeStore()
-	store.dueDisables = []db.Registration{{ID: 42, CleanupPending: true, ExternalUserID: sql.NullString{String: "expired-user", Valid: true}}}
+	store.dueDisables = []db.Registration{{BindingID: 1, ID: 42, CleanupPending: true, ExternalUserID: sql.NullString{String: "expired-user", Valid: true}}}
 	media := &fakeMediaServer{disableErr: errors.New("media unavailable")}
 	ctx := context.Background()
-	s := NewServer(testConfig(), store, media)
+	s := NewServer(testConfig(), store, testMediaFactory(media))
 	s.runMaintenance(ctx)
 	if store.markedDisabledID != 0 || store.failedDisableID != 42 {
 		t.Fatalf("disabled/failed IDs = %d/%d", store.markedDisabledID, store.failedDisableID)

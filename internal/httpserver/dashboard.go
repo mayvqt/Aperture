@@ -18,7 +18,11 @@ func (s *Server) dashboardData(ctx context.Context) ([]db.Invite, []db.Registrat
 	if err != nil {
 		return nil, nil, db.DashboardCounts{}, err
 	}
-	counts, err := s.store.DashboardCounts(ctx)
+	op, err := operationSnapshot(ctx)
+	if err != nil {
+		return nil, nil, db.DashboardCounts{}, err
+	}
+	counts, err := s.store.DashboardCounts(ctx, op.Identity.Binding.ID)
 	if err != nil {
 		return nil, nil, db.DashboardCounts{}, err
 	}
@@ -84,6 +88,9 @@ func (s *Server) dashboardHealth(ctx context.Context, settings db.Settings, coun
 			})
 		}
 	}
+	if counts.NeedsAttention > 0 {
+		checks = append(checks, healthCheck{Level: "warn", Title: "Registrations need review", Detail: "Review incomplete accounts and records saved for an unverified or previous server.", URL: "/admin/registrations?review=1", Action: "Review accounts"})
+	}
 	if counts.Templates > 0 && counts.ActiveInvites == 0 {
 		checks = append(checks, healthCheck{
 			Level:  "warn",
@@ -101,7 +108,11 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 	if err != nil || settings.ServerURL == "" || settings.APIKey == "" {
 		return 0
 	}
-	regs, err := s.store.DueUserDisables(ctx, 25)
+	op, err := operationSnapshot(ctx)
+	if err != nil {
+		return 0
+	}
+	regs, err := s.store.DueUserDisables(ctx, op.Identity.Binding.ID, 25)
 	if err != nil {
 		slog.Warn("could not list due media-server user disables", "error", safeError(err))
 		return 0
@@ -109,6 +120,10 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 	disabled := 0
 	for _, reg := range regs {
 		if ctx.Err() != nil {
+			break
+		}
+		operationCtx, err := s.refreshAccountContext(ctx)
+		if err != nil {
 			break
 		}
 		release, err := s.claimAccountOperations(reg.ID)
@@ -120,7 +135,13 @@ func (s *Server) processDueUserDisables(ctx context.Context) int {
 			release()
 			continue
 		}
-		err = s.disableAccount(ctx, settings, current)
+		releaseUser, claimErr := s.claimMediaUser(op.Identity.Binding.ID, current.ExternalUserID.String)
+		if claimErr != nil {
+			release()
+			continue
+		}
+		err = s.disableAccount(operationCtx, current)
+		releaseUser()
 		release()
 		if err != nil {
 			slog.Warn("media-server user disable will retry", "registration_id", reg.ID, "error", safeError(err))
@@ -136,7 +157,11 @@ func (s *Server) processDueTemplateRetries(ctx context.Context) {
 	if err != nil || settings.ServerURL == "" || settings.APIKey == "" {
 		return
 	}
-	ids, err := s.store.ListDueTemplateRecoveryIDs(ctx, 10)
+	op, err := operationSnapshot(ctx)
+	if err != nil {
+		return
+	}
+	ids, err := s.store.ListDueTemplateRecoveryIDs(ctx, op.Identity.Binding.ID, 10)
 	if err != nil {
 		slog.Warn("could not list template retries", "error", safeError(err))
 		return
@@ -145,7 +170,11 @@ func (s *Server) processDueTemplateRetries(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if err := s.recoverAccount(ctx, settings, id, true); err != nil {
+		operationCtx, err := s.refreshAccountContext(ctx)
+		if err != nil {
+			return
+		}
+		if err := s.recoverAccount(operationCtx, id, true); err != nil {
 			slog.Warn("template recovery did not complete", "registration_id", id, "error", safeError(err))
 		}
 	}

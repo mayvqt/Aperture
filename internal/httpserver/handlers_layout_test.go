@@ -9,7 +9,7 @@ import (
 
 func TestAdminNavShowsDashboardWithoutBrandIcon(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -40,7 +40,7 @@ func TestAdminNavShowsDashboardWithoutBrandIcon(t *testing.T) {
 
 func TestAuthPagesUseFullViewportShell(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
 	rr := httptest.NewRecorder()
 
@@ -62,7 +62,7 @@ func TestAuthPagesUseFullViewportShell(t *testing.T) {
 }
 
 func TestAuthTitlesAndAdminNavScript(t *testing.T) {
-	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	handler := New(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/guide", nil)
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -74,7 +74,7 @@ func TestAuthTitlesAndAdminNavScript(t *testing.T) {
 	assetRR := httptest.NewRecorder()
 	handler.ServeHTTP(assetRR, assetReq)
 	asset := assetRR.Body.String()
-	for _, want := range []string{`nav.admin-nav`, `a[aria-current="page"]`, `scrollIntoView`, `prefers-reduced-motion`} {
+	for _, want := range []string{`nav.admin-nav`, `.nav-toggle`, `aria-expanded`, `Escape`, `prefers-reduced-motion`} {
 		if !strings.Contains(asset, want) {
 			t.Fatalf("app.js missing %q:\n%s", want, asset)
 		}
@@ -83,7 +83,7 @@ func TestAuthTitlesAndAdminNavScript(t *testing.T) {
 
 func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	assetReq := httptest.NewRequest(http.MethodGet, "/assets/app.css", nil)
 	assetRR := httptest.NewRecorder()
@@ -122,7 +122,7 @@ func TestStaticAssetsAndCSPUseExternalCSSAndJS(t *testing.T) {
 }
 
 func TestHSTSOnlyAppliesToConfiguredHTTPSHost(t *testing.T) {
-	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	handler := New(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/login", nil)
 	req.Host = "internal-proxy:8099"
 	rr := httptest.NewRecorder()

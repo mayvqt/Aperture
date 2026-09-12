@@ -750,3 +750,7 @@ pre {
     max-height: 240px;
     overflow: auto;
 }
+
+.server-review p {
+    overflow-wrap: anywhere;
+}

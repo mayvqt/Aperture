@@ -130,7 +130,12 @@ func (s *Server) templatesImport(w http.ResponseWriter, r *http.Request, session
 		s.message(w, "Import needs media-server access", "Save an API key in settings or log in again with a media-server administrator account.", http.StatusBadRequest)
 		return
 	}
-	imported, err := s.media.ImportTemplate(r.Context(), settings.ServerURL, token, deviceID, userRef)
+	op, err := operationSnapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	imported, err := op.Media.ImportTemplate(r.Context(), settings.ServerURL, token, deviceID, userRef)
 	if err != nil {
 		slog.Warn("template import failed", "error", safeError(err))
 		status := http.StatusBadGateway

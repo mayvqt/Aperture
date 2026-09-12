@@ -15,7 +15,7 @@ import (
 )
 
 func TestWebhooksPageUsesExpandableCreateForm(t *testing.T) {
-	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	handler := New(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{}))
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/webhooks", nil))
 

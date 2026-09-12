@@ -17,7 +17,7 @@ func TestRegistrationTemplateRetryUsesSavedSnapshot(t *testing.T) {
 	store := newFakeStore()
 	store.recovery.Template.PolicyJSON = `{"EnableAllFolders":false}`
 	media := &fakeMediaServer{}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/registrations/1/retry-template", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -39,12 +39,13 @@ func TestRegistrationTemplateRetryUsesSavedSnapshot(t *testing.T) {
 func TestRegistrationsPageShowsTemplateRecoveryAction(t *testing.T) {
 	store := newFakeStore()
 	store.registrations = []db.Registration{{
+		BindingID:      1,
 		ID:             7,
 		Status:         db.RegistrationNeedsAttention,
 		ExternalUserID: sql.NullString{String: "media-alice", Valid: true},
 		ErrorMessage:   sql.NullString{String: "policy failed", Valid: true},
 	}}
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/registrations", nil)
 	rr := httptest.NewRecorder()
 
@@ -80,7 +81,7 @@ func TestRegistrationsPageShowsTemplateRecoveryAction(t *testing.T) {
 func TestRegistrationTemplateRetryRecordsFailure(t *testing.T) {
 	store := newFakeStore()
 	media := &fakeMediaServer{applyErr: errors.New("apply failed")}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/registrations/1/retry-template", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -103,12 +104,12 @@ func TestRegistrationDeleteRemovesUpstreamUserWhenPresent(t *testing.T) {
 		wantUpstreamDelete bool
 	}{
 		{name: "user already deleted"},
-		{name: "user still exists", liveUsers: []mediaserver.User{{ID: "media-alice", Name: "alice"}}, wantUpstreamDelete: true},
+		{name: "user still exists", liveUsers: []mediaserver.User{{ID: "media-alice", Name: "alice", Policy: []byte(`{"IsAdministrator":false}`)}}, wantUpstreamDelete: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			store := newFakeStore()
 			media := &fakeMediaServer{users: test.liveUsers}
-			handler := New(testConfig(), store, media)
+			handler := New(testConfig(), store, testMediaFactory(media))
 			form := url.Values{"csrf": {store.session.CSRFSecret}}
 			req := adminRequest(t, http.MethodPost, "/admin/registrations/1/delete", strings.NewReader(form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

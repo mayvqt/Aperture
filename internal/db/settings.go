@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/mayvqt/aperture/internal/security"
 )
@@ -33,17 +31,6 @@ func (s *Store) ensureRuntimeSecret(ctx context.Context, key, configured string)
 	return s.SetSetting(ctx, key, generated, true)
 }
 
-func (s *Store) ValidateMediaProvider(ctx context.Context, configured string) error {
-	settings, err := s.Settings(ctx)
-	if err != nil {
-		return err
-	}
-	saved := strings.TrimSpace(settings.Provider)
-	if saved != "" && saved != configured {
-		return fmt.Errorf("configured media provider %q does not match database provider %q; reset the database or restore APERTURE_MEDIA_PROVIDER=%s", configured, saved, saved)
-	}
-	return nil
-}
 func (s *Store) Settings(ctx context.Context) (Settings, error) {
 	s.settingsMu.RLock()
 	if s.settingsCached {
@@ -131,82 +118,6 @@ func (s *Store) SetSetting(ctx context.Context, key, value string, secret bool) 
 		s.settingsCached = false
 	}
 	return err
-}
-
-func (s *Store) UpdateApplicationSettings(ctx context.Context, provider, publicURL, serverURL, apiKey *string) error {
-	var encryptedAPIKey string
-	if apiKey != nil {
-		var err error
-		encryptedAPIKey, _, err = s.settingValue(*apiKey, true)
-		if err != nil {
-			return err
-		}
-	}
-
-	s.settingsMu.Lock()
-	defer s.settingsMu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if provider != nil {
-		if err := upsertSetting(ctx, tx, "media_provider", *provider, 0); err != nil {
-			return err
-		}
-	}
-	if publicURL != nil {
-		if err := upsertSetting(ctx, tx, "public_url", *publicURL, 0); err != nil {
-			return err
-		}
-	}
-	if serverURL != nil {
-		if err := upsertSetting(ctx, tx, "server_url", *serverURL, 0); err != nil {
-			return err
-		}
-	}
-	if apiKey != nil {
-		if err := upsertSetting(ctx, tx, "api_key", encryptedAPIKey, 1); err != nil {
-			return err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	s.settingsCached = false
-	return nil
-}
-
-func (s *Store) UpdateSetupSettings(ctx context.Context, provider, publicURL, serverURL, apiKey string) error {
-	encryptedAPIKey, _, err := s.settingValue(apiKey, true)
-	if err != nil {
-		return err
-	}
-	s.settingsMu.Lock()
-	defer s.settingsMu.Unlock()
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	values := []struct{ key, value string }{
-		{"media_provider", provider},
-		{"public_url", publicURL},
-		{"server_url", serverURL},
-	}
-	for _, setting := range values {
-		if err := upsertSetting(ctx, tx, setting.key, setting.value, 0); err != nil {
-			return err
-		}
-	}
-	if err := upsertSetting(ctx, tx, "api_key", encryptedAPIKey, 1); err != nil {
-		return err
-	}
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	s.settingsCached = false
-	return nil
 }
 
 func (s *Store) settingValue(value string, secret bool) (string, int, error) {

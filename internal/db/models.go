@@ -43,6 +43,7 @@ type Template struct {
 
 type Invite struct {
 	ID              int64
+	BindingID       int64
 	TokenHash       string
 	TokenPrefix     string
 	Token           string
@@ -115,6 +116,7 @@ func (r Registration) NeedsDisable(now time.Time) bool {
 
 type Registration struct {
 	ID                    int64
+	BindingID             int64
 	InviteID              int64
 	ExternalUserID        sql.NullString
 	Username              string
@@ -157,6 +159,8 @@ type Webhook struct {
 }
 
 type ManagedUser struct {
+	ID             int64
+	BindingID      int64
 	ExternalUserID string
 	Username       string
 	CreatedAt      time.Time

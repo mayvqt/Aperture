@@ -103,7 +103,7 @@ func (s *Store) ReconcileStaleRegistrations(ctx context.Context, staleBefore tim
 	return result, tx.Commit()
 }
 
-func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64, automatic bool) (RegistrationRecovery, error) {
+func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID, bindingID int64, automatic bool) (RegistrationRecovery, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return RegistrationRecovery{}, err
@@ -121,14 +121,14 @@ func (s *Store) ClaimTemplateRecovery(ctx context.Context, registrationID int64,
 		SELECT r.id, r.invite_id, r.external_user_id, r.username, r.status, r.error_message,
 		       r.user_disable_at, r.user_disabled_at,
 		       r.disable_attempts, r.next_disable_attempt_at, r.template_attempts, r.next_template_attempt_at, r.created_at, r.updated_at,
-		       r.cleanup_pending, r.cleanup_error,
+		       r.cleanup_pending, r.cleanup_error, COALESCE(r.binding_id,0),
 		       COALESCE(r.template_name, ''),
 		       COALESCE(r.template_policy_json, ''),
 		       i.user_expiry_days
 		FROM registrations r
 		JOIN invites i ON i.id = r.invite_id
-		WHERE r.id = ?
-	`, registrationID).Scan(destinations...)
+		WHERE r.id = ? AND r.binding_id = ?
+	`, registrationID, bindingID).Scan(destinations...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return RegistrationRecovery{}, ErrNotFound
 	}

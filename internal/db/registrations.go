@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at, cleanup_pending, cleanup_error`
+const registrationColumns = `id, invite_id, external_user_id, username, status, error_message, user_disable_at, user_disabled_at, disable_attempts, next_disable_attempt_at, template_attempts, next_template_attempt_at, created_at, updated_at, cleanup_pending, cleanup_error, COALESCE(binding_id,0)`
 
 // RecordProvisioningUser is called before a second provider request can begin.
 // Password setup is still incomplete and template recovery remains forbidden.
@@ -82,17 +82,17 @@ func (s *Store) CompleteRegistration(ctx context.Context, registrationID int64, 
 	return requireSingleTransition(result)
 }
 
-func (s *Store) DueUserDisables(ctx context.Context, limit int) ([]Registration, error) {
+func (s *Store) DueUserDisables(ctx context.Context, bindingID int64, limit int) ([]Registration, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+registrationColumns+`
 		FROM registrations
-		WHERE external_user_id IS NOT NULL
+		WHERE binding_id = ? AND external_user_id IS NOT NULL
 		  AND (cleanup_pending = 1 OR (user_disable_at <= CURRENT_TIMESTAMP AND user_disabled_at IS NULL))
 		  AND status NOT IN ('reserved','creating_user','applying_template','retrying_template','pending')
 		  AND (next_disable_attempt_at IS NULL OR next_disable_attempt_at <= CURRENT_TIMESTAMP)
 		ORDER BY next_disable_attempt_at ASC, user_disable_at ASC
 		LIMIT ?
-	`, limit)
+	`, bindingID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -175,14 +175,14 @@ func (s *Store) RecentRegistrations(ctx context.Context, limit int) ([]Registrat
 	return regs, rows.Err()
 }
 
-func (s *Store) RegistrationUsers(ctx context.Context) ([]Registration, error) {
+func (s *Store) RegistrationUsers(ctx context.Context, bindingID int64) ([]Registration, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT `+registrationColumns+`
 		FROM registrations
 		WHERE external_user_id IS NOT NULL
-		  AND id IN (SELECT MAX(id) FROM registrations WHERE external_user_id IS NOT NULL GROUP BY external_user_id)
+		  AND binding_id = ? AND id IN (SELECT MAX(id) FROM registrations WHERE binding_id = ? AND external_user_id IS NOT NULL GROUP BY external_user_id)
 		ORDER BY username COLLATE NOCASE
-	`)
+	`, bindingID, bindingID)
 	if err != nil {
 		return nil, err
 	}
@@ -222,57 +222,33 @@ func (s *Store) DeleteRegistration(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *Store) DashboardCounts(ctx context.Context) (DashboardCounts, error) {
+func (s *Store) DashboardCounts(ctx context.Context, bindingID int64) (DashboardCounts, error) {
 	var counts DashboardCounts
 	err := s.db.QueryRowContext(ctx, `
 		SELECT
 			(SELECT COUNT(*)
 			 FROM invites
-			 WHERE enabled = 1
+			 WHERE binding_id = ? AND enabled = 1
 			   AND deleted_at IS NULL
 			   AND uses < max_uses
 			   AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)),
 			(SELECT COUNT(*) FROM templates),
 			(SELECT COUNT(*)
 			 FROM registrations
-			 WHERE status IN (?, ?, ?, ?)),
+			 WHERE COALESCE(binding_id,0)<>? OR cleanup_pending=1 OR status IN (?, ?, ?, ?)),
 			(SELECT COUNT(*)
 			 FROM registrations
-			 WHERE external_user_id IS NOT NULL
+			 WHERE binding_id = ? AND external_user_id IS NOT NULL
 			   AND user_disable_at IS NOT NULL
 			   AND user_disabled_at IS NULL)
 	`,
+		bindingID, bindingID,
 		RegistrationNeedsAttention,
 		RegistrationFailedCreateUser,
 		RegistrationFailedApplyTemplate,
-		RegistrationDisableFailed,
+		RegistrationDisableFailed, bindingID,
 	).Scan(&counts.ActiveInvites, &counts.Templates, &counts.NeedsAttention, &counts.ScheduledUserDisables)
 	return counts, err
-}
-
-func (s *Store) LatestInviteActivity(ctx context.Context) (map[int64]InviteActivity, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT r.invite_id, r.username, r.status, r.created_at
-		FROM registrations r
-		JOIN (
-			SELECT invite_id, MAX(id) AS id
-			FROM registrations
-			GROUP BY invite_id
-		) latest ON latest.id = r.id
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	activity := map[int64]InviteActivity{}
-	for rows.Next() {
-		var item InviteActivity
-		if err := rows.Scan(&item.InviteID, &item.Username, &item.Status, &item.CreatedAt); err != nil {
-			return nil, err
-		}
-		activity[item.InviteID] = item
-	}
-	return activity, rows.Err()
 }
 
 func scanRegistration(scanner rowScanner) (Registration, error) {
@@ -299,6 +275,7 @@ func registrationScanDestinations(reg *Registration) []any {
 		&reg.UpdatedAt,
 		&reg.CleanupPending,
 		&reg.CleanupError,
+		&reg.BindingID,
 	}
 }
 

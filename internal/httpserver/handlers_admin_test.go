@@ -20,7 +20,7 @@ func TestAdminDashboardLeavesDueUserDisablesToBackgroundWorker(t *testing.T) {
 		ExternalUserID: sql.NullString{String: "media-expired", Valid: true},
 	}}
 	media := &fakeMediaServer{}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -36,7 +36,7 @@ func TestAdminDashboardLeavesDueUserDisablesToBackgroundWorker(t *testing.T) {
 
 func TestSettingsEnvironmentValuesAreManagedAndNotWritable(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	getReq := adminRequest(t, http.MethodGet, "/admin/settings", nil)
 	getRR := httptest.NewRecorder()
@@ -100,7 +100,7 @@ func TestSettingsUpdatesAllBrowserManagedApplicationSettings(t *testing.T) {
 	cfg.ServerURLManaged = false
 	cfg.APIKeyManaged = false
 	media := &fakeMediaServer{provider: mediaserver.ProviderJellyfin}
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	form := url.Values{
 		"csrf":       {store.session.CSRFSecret},
@@ -121,7 +121,7 @@ func TestSettingsUpdatesAllBrowserManagedApplicationSettings(t *testing.T) {
 	if rr.Header().Get("Location") != "/login" || store.deletedSessionID != store.session.ID {
 		t.Fatalf("provider switch did not clear the old media-server session")
 	}
-	if media.provider != mediaserver.ProviderEmby {
+	if handler.(*Server).connectionsStateProvider() != "emby" {
 		t.Fatalf("active provider = %q, want Emby", media.provider)
 	}
 	if store.settings.Provider != "emby" || store.settings.PublicURL != "https://join.example.com" ||
@@ -138,7 +138,7 @@ func TestSettingsCanRemoveSavedAPIKey(t *testing.T) {
 	cfg := testConfig()
 	cfg.APIKey = ""
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":           {store.session.CSRFSecret},
 		"remove_api_key": {"on"},
@@ -167,7 +167,7 @@ func TestSettingsNeverRendersAPIKey(t *testing.T) {
 	cfg := testConfig()
 	cfg.APIKey = "environment-api-key-never-render"
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 
 	req := adminRequest(t, http.MethodGet, "/admin/settings", nil)
 	rr := httptest.NewRecorder()
@@ -239,7 +239,7 @@ func TestSettingsPostWritesOnlyUIManagedValues(t *testing.T) {
 			store := newFakeStore()
 			cfg := testConfig()
 			tt.configure(&cfg)
-			handler := New(cfg, store, &fakeMediaServer{})
+			handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 			form := url.Values{
 				"csrf":       {store.session.CSRFSecret},
 				"server_url": {"http://new-media:8096"},
@@ -270,7 +270,7 @@ func TestSettingsPostRejectsUnreachableConnectionBeforeWriting(t *testing.T) {
 	cfg.APIKey = ""
 	cfg.ServerURLManaged = false
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{pingErr: errFakePing})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{inspectErr: errFakePing}))
 	form := url.Values{
 		"csrf":       {store.session.CSRFSecret},
 		"server_url": {"http://new-media:8096"},
@@ -282,7 +282,7 @@ func TestSettingsPostRejectsUnreachableConnectionBeforeWriting(t *testing.T) {
 
 	handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Could not reach the media server") {
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "Could not verify or save this connection") {
 		t.Fatalf("status = %d; body %s", rr.Code, rr.Body.String())
 	}
 	if len(store.settingWrites) != 0 {
@@ -294,7 +294,7 @@ func TestAdminDashboardShowsHealthChecks(t *testing.T) {
 	store := newFakeStore()
 	store.invites = nil
 	media := &fakeMediaServer{pingErr: errFakePing}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -313,7 +313,7 @@ func TestAdminDashboardShowsHealthChecks(t *testing.T) {
 
 func TestAdminDashboardDoesNotRenderRetainedInviteTokens(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -337,7 +337,7 @@ func TestAdminDashboardCachesMediaServerHealthCheck(t *testing.T) {
 	cfg.APIKey = ""
 	cfg.ServerURLManaged = false
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	for range 2 {
 		req := adminRequest(t, http.MethodGet, "/admin", nil)
@@ -361,7 +361,7 @@ func TestAdminDashboardHealthCacheChangesWithCredentials(t *testing.T) {
 	cfg.APIKey = ""
 	cfg.ServerURLManaged = false
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	request := func() {
 		t.Helper()
@@ -374,7 +374,16 @@ func TestAdminDashboardHealthCacheChangesWithCredentials(t *testing.T) {
 	}
 
 	request()
-	store.settings.APIKey = "replacement-api-key"
+	server := handler.(*Server)
+	current, err := server.connections.Current(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := current.Settings
+	target.APIKey = "replacement-api-key"
+	if _, err := server.connections.Publish(t.Context(), current, target, server.settingsUpdate(target, true)); err != nil {
+		t.Fatal(err)
+	}
 	request()
 	if media.pingCalls.Load() != 2 {
 		t.Fatalf("media-server ping calls after credential change = %d, want 2", media.pingCalls.Load())

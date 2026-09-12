@@ -46,3 +46,8 @@ The one comprehensive gate is the complete GitHub Actions `CI` workflow in
 whitespace, `go test ./...`, the entrypoint, vet, race detection, pinned
 Staticcheck and govulncheck versions, a release-style build, and the Docker image.
 Do not claim release readiness until both jobs pass on that revision.
+
+Origin regressions cover upgrades from revisions 1–5, encrypted invite preservation,
+rollback, unknown ownership, cloned IDs at different URLs, replacement servers,
+API-key rotation, session revocation, lost settings acknowledgements, optional-key
+login, scoped work queues and paginated review of old records.

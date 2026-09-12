@@ -37,3 +37,12 @@ password-setup failures before upgrading as described in [Security](../SECURITY.
 Allow four minutes for accepted account operations to finish before SQLite
 closes. The supplied Compose and Unraid configurations allow 270 seconds,
 including notification delivery, before forcing the process to stop.
+
+After upgrading to revision 6, sign in again and review saved invites and accounts.
+Legacy ownership is unknown, so automatic account changes pause until each account
+is assigned. On **Invites** and **Registrations**, use **Review server**; previously
+imported users are under **Users → Tracked user history**. Confirm the displayed
+server and account ID before assigning. Existing deadlines are preserved, so an
+expired or incomplete assigned account may be disabled on the next maintenance
+run. Reconnecting the same provider, normalized URL and server ID restores its
+existing ownership; an outage does not silently assign records elsewhere.

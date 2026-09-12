@@ -12,11 +12,11 @@ import (
 
 func TestAccountCleanupSurvivesExhaustedTemplateRetries(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "cleanup", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "cleanup", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, _, err := store.ReserveInviteUse(ctx, inviteID, "", "", "alice")
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "", "", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,20 +40,20 @@ func TestAccountCleanupSurvivesExhaustedTemplateRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 	for attempt := 0; attempt < 6; attempt++ {
-		if _, err := store.ClaimTemplateRecovery(ctx, id, false); err != nil {
+		if _, err := store.ClaimTemplateRecovery(ctx, id, 1, false); err != nil {
 			t.Fatal(err)
 		}
 		if err := store.RecordTemplateRetryFailure(ctx, id, "response lost"); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if ids, err := store.ListDueTemplateRecoveryIDs(ctx, 10); err != nil || len(ids) != 0 {
+	if ids, err := store.ListDueTemplateRecoveryIDs(ctx, 1, 10); err != nil || len(ids) != 0 {
 		t.Fatalf("exhausted retries=%v %v", ids, err)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, id, true); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, id, 1, true); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("automatic claim bypassed cap: %v", err)
 	}
-	due, err := store.DueUserDisables(ctx, 10)
+	due, err := store.DueUserDisables(ctx, 1, 10)
 	if err != nil || len(due) != 1 {
 		t.Fatalf("missing durable cleanup=%+v %v", due, err)
 	}
@@ -67,7 +67,7 @@ func TestAccountCleanupSurvivesExhaustedTemplateRetries(t *testing.T) {
 	if clean.CleanupPending || clean.UserDisabledAt.Valid || !clean.UserDisableAt.Time.Equal(reserved.UserDisableAt.Time) || clean.Status != RegistrationNeedsAttention {
 		t.Fatalf("cleanup changed access window: %+v", clean)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, id, false); err != nil {
+	if _, err := store.ClaimTemplateRecovery(ctx, id, 1, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.CompleteTemplateRecovery(ctx, id); err != nil {
@@ -84,11 +84,11 @@ func TestAccountCleanupSurvivesExhaustedTemplateRetries(t *testing.T) {
 
 func TestInterruptedPasswordSetupHasCleanupButCannotActivate(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "password-crash", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "password-crash", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, _, err := store.ReserveInviteUse(ctx, inviteID, "", "", "alice")
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "", "", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,10 +104,10 @@ func TestInterruptedPasswordSetupHasCleanupButCannotActivate(t *testing.T) {
 	if _, err := store.ReconcileStaleRegistrations(ctx, time.Now().Add(-15*time.Minute), 10); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, id, false); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, id, 1, false); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("password-incomplete activation: %v", err)
 	}
-	due, err := store.DueUserDisables(ctx, 10)
+	due, err := store.DueUserDisables(ctx, 1, 10)
 	if err != nil || len(due) != 1 || due[0].ExternalUserID.String != "partial-id" {
 		t.Fatalf("interrupted password cleanup=%+v %v", due, err)
 	}
@@ -115,11 +115,11 @@ func TestInterruptedPasswordSetupHasCleanupButCannotActivate(t *testing.T) {
 
 func TestCleanupBackoffCannotPostponeAccountExpiry(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "cleanup-expiry", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "cleanup-expiry", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, _, err := store.ReserveInviteUse(ctx, inviteID, "", "", "alice")
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "", "", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestCleanupBackoffCannotPostponeAccountExpiry(t *testing.T) {
 }
 
 func TestCleanupMigrationPreservesHistoryAndSecrets(t *testing.T) {
-	for revision := 1; revision <= 4; revision++ {
+	for revision := 1; revision <= 5; revision++ {
 		t.Run(fmt.Sprint(revision), func(t *testing.T) {
 			store := legacyCleanupStore(t, revision)
 			ctx := t.Context()
@@ -164,7 +164,7 @@ func TestCleanupMigrationPreservesHistoryAndSecrets(t *testing.T) {
 			if err != nil || settings.APIKey != "synthetic-api-key" {
 				t.Fatalf("secret preservation: %v", err)
 			}
-			inv, err := store.InviteByHash(ctx, "legacy-token-hash")
+			inv, err := store.Invite(ctx, 1)
 			if err != nil || inv.Token != "synthetic-invite-token" {
 				t.Fatalf("invite preservation: %v", err)
 			}
@@ -242,7 +242,16 @@ func legacyCleanupStore(t *testing.T, revision int) *Store {
 	if _, err := store.db.Exec(`INSERT INTO templates(id,name,policy_json,created_at,updated_at) VALUES(1,'Legacy','{}',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`); err != nil {
 		t.Fatal(err)
 	}
-	id, err := store.CreateInvite(ctx, Invite{TokenHash: "legacy-token-hash", Token: "synthetic-invite-token", TemplateID: 1, MaxUses: 2, UserExpiryDays: 7})
+
+	encrypted, err := store.encryptor.EncryptString("synthetic-invite-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.db.Exec(`INSERT INTO invites(token_hash,token_encrypted,template_id,max_uses,user_expiry_days,created_at,updated_at) VALUES('legacy-token-hash',?,1,2,7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`, encrypted)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := result.LastInsertId()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,6 +259,19 @@ func legacyCleanupStore(t *testing.T, revision int) *Store {
 	 (?, 'missing-deadline','first-user','needs_attention',NULL,datetime('now','+30 days'),'2020-01-01 00:00:00','2020-01-01 00:00:00'),
 	 (?, 'existing-deadline','second-user','failed_apply_template','2020-01-03 00:00:00',NULL,'2020-01-01 00:00:00','2020-01-01 00:00:00')`, id, id); err != nil {
 		t.Fatal(err)
+	}
+	if revision == 5 {
+		tx, err := store.db.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := migrateAccountCleanup(ctx, tx); err != nil {
+			tx.Rollback()
+			t.Fatal(err)
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	return store
 }

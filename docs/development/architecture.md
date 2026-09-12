@@ -41,3 +41,12 @@ stale work, disables incomplete and expired accounts before retrying templates,
 and prunes audit events. Graceful shutdown drains accepted HTTP and maintenance
 work before notifications and before closing SQLite. Changes to
 these flows must preserve idempotency, bounded work, and cancellation behavior.
+
+`internal/connection` resolves deployment overrides and publishes immutable
+connection snapshots through a media adapter factory. Each accepted operation
+retains its adapter, URL, credentials and verified ownership. Administrative
+sessions must match both binding and generation before their tokens are sent;
+authenticated system information detects a replacement at the same URL.
+Background account queries filter ownership before limits and grouping. History
+remains readable across origins; explicit assignment uses account operation guards
+and verifies an existing non-administrator account at the destination.

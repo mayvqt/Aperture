@@ -13,7 +13,7 @@ import (
 
 func TestTemplatesCreateStripsAdminPrivilege(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":        {store.session.CSRFSecret},
 		"name":        {"Imported"},
@@ -43,7 +43,7 @@ func TestTemplatesCreateStripsAdminPrivilege(t *testing.T) {
 func TestTemplatesPageUsesExpandableWorkflows(t *testing.T) {
 	store := newFakeStore()
 	store.template.IsDefault = false
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/templates", nil))
 
@@ -69,7 +69,7 @@ func TestTemplateDetailShowsPreviewAndUpdatesTemplate(t *testing.T) {
 		Description: "limited",
 		PolicyJSON:  `{"IsAdministrator":false,"EnabledFolders":["Movies"]}`,
 	}
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/templates/7", nil)
 	rr := httptest.NewRecorder()
 
@@ -130,7 +130,7 @@ func TestTemplateDetailShowsPreviewAndUpdatesTemplate(t *testing.T) {
 func TestTemplateDefaultAndDeleteHandlers(t *testing.T) {
 	store := newFakeStore()
 	store.template = db.Template{ID: 7, Name: "Kids", PolicyJSON: `{"IsAdministrator":false}`}
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/templates/7/default", strings.NewReader(form.Encode()))
@@ -160,7 +160,7 @@ func TestTemplateDefaultAndDeleteHandlers(t *testing.T) {
 
 func TestTemplateImportReturnsNotFoundForUnknownMediaUser(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{importErr: mediaserver.ErrUserNotFound})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{importErr: mediaserver.ErrUserNotFound}))
 	form := url.Values{
 		"csrf":             {store.session.CSRFSecret},
 		"name":             {"Imported"},

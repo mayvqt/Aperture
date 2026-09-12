@@ -81,8 +81,8 @@ func (s *Store) DeleteWebhook(ctx context.Context, id int64) error {
 	}
 	return err
 }
-func (s *Store) ListDueTemplateRecoveryIDs(ctx context.Context, limit int) ([]int64, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT r.id FROM registrations r WHERE r.external_user_id IS NOT NULL AND r.status IN (?,?) AND r.template_attempts < 6 AND (r.next_template_attempt_at IS NULL OR r.next_template_attempt_at <= CURRENT_TIMESTAMP) ORDER BY COALESCE(r.next_template_attempt_at,r.updated_at),r.id LIMIT ?`, RegistrationNeedsAttention, RegistrationFailedApplyTemplate, limit)
+func (s *Store) ListDueTemplateRecoveryIDs(ctx context.Context, bindingID int64, limit int) ([]int64, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT r.id FROM registrations r WHERE r.binding_id = ? AND r.external_user_id IS NOT NULL AND r.status IN (?,?) AND r.template_attempts < 6 AND (r.next_template_attempt_at IS NULL OR r.next_template_attempt_at <= CURRENT_TIMESTAMP) ORDER BY COALESCE(r.next_template_attempt_at,r.updated_at),r.id LIMIT ?`, bindingID, RegistrationNeedsAttention, RegistrationFailedApplyTemplate, limit)
 	if err != nil {
 		return nil, err
 	}

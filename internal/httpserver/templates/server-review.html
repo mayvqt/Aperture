@@ -1,0 +1,22 @@
+{{define "server-review"}}{{template "base-start" .}}
+<div class="page-head"><div><h1>Review server assignment</h1><p>Confirm which server owns this {{.Review.Kind}} before Aperture manages it.</p></div></div>
+<section class="panel server-review">
+<h2>{{.Review.Name}}</h2>
+<p><strong>Saved server:</strong> {{.Review.Source}}</p>
+<p><strong>Assign to:</strong> {{.Review.Destination}}</p>
+{{if .Review.UserID}}<p><strong>Account ID:</strong> {{.Review.UserID}}</p><p><strong>Account on this server:</strong> {{.Review.AccountName}}</p>{{end}}
+{{if .Review.Expiry}}<p><strong>Original access deadline:</strong> {{.Review.Expiry}}</p><p>The deadline stays the same. Expired or incomplete accounts will be disabled by the next maintenance run.</p>{{end}}
+{{if eq .Review.Kind "invite"}}<p>The link, signup count and expiry stay the same. Existing registrations keep their own server assignments. Review the invite's template for this server before sharing the link.</p>{{end}}
+<form method="post" action="/admin/server-review/{{.Review.Kind}}/{{.Review.ID}}">
+<input type="hidden" name="csrf" value="{{.CSRF}}"><input type="hidden" name="binding_id" value="{{.BindingID}}"><input type="hidden" name="source_id" value="{{.Review.BindingID}}">
+<label class="check"><input type="checkbox" name="confirmed" value="yes" required> I have checked that this record belongs to the account or invite on this server.</label>
+<div class="actions"><button>Assign to this server</button><a class="button secondary" href="/admin">Cancel</a></div>
+</form></section>{{template "base-end" .}}{{end}}
+
+{{define "users-review"}}{{template "base-start" .}}
+<div class="page-head"><div><h1>Tracked user history</h1><p>These accounts belong to an unverified or previous server. Review each account before assigning it.</p></div><a href="/admin/users" class="button secondary">Current users</a></div>
+<div class="table-wrap"><table><thead><tr><th>User</th><th>Account ID</th><th>Saved</th><th>Action</th></tr></thead><tbody>
+{{range .ManagedHistory}}<tr><td>{{.Username}}</td><td>{{.ExternalUserID}}</td><td>{{dateTime .CreatedAt}}</td><td><a class="button secondary small" href="/admin/server-review/user/{{.ID}}">Review server</a></td></tr>{{else}}<tr><td colspan="4">No tracked users need server review.</td></tr>{{end}}
+</tbody></table></div>
+<nav class="actions" aria-label="History pages">{{if .HistoryBefore}}<a href="/admin/users/review">Newest</a>{{end}}{{if .NextBefore}}<a href="/admin/users/review?before={{.NextBefore}}">Older users</a>{{end}}</nav>
+{{template "base-end" .}}{{end}}

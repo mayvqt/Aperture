@@ -17,7 +17,12 @@ const accountCleanupTimeout = 45 * time.Second
 // recoverAccount is shared by the administrator action and maintenance. The
 // local gate serializes recovery, disable and deletion of each registration; the store claim also
 // rejects stale actions. One Aperture process owns each state directory.
-func (s *Server) recoverAccount(parent context.Context, settings db.Settings, id int64, automatic bool) (err error) {
+func (s *Server) recoverAccount(parent context.Context, id int64, automatic bool) (err error) {
+	op, err := operationSnapshot(parent)
+	if err != nil {
+		return err
+	}
+	settings := op.Settings
 	release, err := s.claimAccountOperations(id)
 	if err != nil {
 		return err
@@ -26,7 +31,19 @@ func (s *Server) recoverAccount(parent context.Context, settings db.Settings, id
 	if err := parent.Err(); err != nil {
 		return err
 	}
-	recovery, err := s.store.ClaimTemplateRecovery(parent, id, automatic)
+	saved, err := s.store.Registration(parent, id)
+	if err != nil {
+		return err
+	}
+	if saved.BindingID != op.Identity.Binding.ID {
+		return db.ErrRegistrationTransition
+	}
+	releaseUser, err := s.claimMediaUser(op.Identity.Binding.ID, saved.ExternalUserID.String)
+	if err != nil {
+		return err
+	}
+	defer releaseUser()
+	recovery, err := s.store.ClaimTemplateRecovery(parent, id, op.Identity.Binding.ID, automatic)
 	if err != nil {
 		return err
 	}
@@ -34,7 +51,7 @@ func (s *Server) recoverAccount(parent context.Context, settings db.Settings, id
 	defer cancel()
 	reg := recovery.Registration
 	if reg.UserDisableAt.Valid && !reg.UserDisableAt.Time.After(time.Now()) {
-		return s.disableAccount(ctx, settings, reg)
+		return s.disableAccount(ctx, reg)
 	}
 	succeeded := false
 	defer func() {
@@ -46,7 +63,7 @@ func (s *Server) recoverAccount(parent context.Context, settings db.Settings, id
 		if recordErr := s.store.RecordTemplateRetryFailure(persistCtx, id, safeError(err)); recordErr != nil {
 			slog.Error("could not record template retry failure", "registration_id", id, "error", safeError(recordErr))
 		}
-		s.secureIncompleteAccount(parent, settings, id, reg.ExternalUserID.String)
+		s.secureIncompleteAccount(parent, id, reg.ExternalUserID.String)
 		if automatic {
 			description := "Aperture will retry access with backoff."
 			if reg.TemplateAttempts+1 >= 6 {
@@ -58,7 +75,7 @@ func (s *Server) recoverAccount(parent context.Context, settings db.Settings, id
 	if strings.TrimSpace(recovery.Template.PolicyJSON) == "" {
 		return errors.New("saved registration template is unavailable")
 	}
-	if err = s.media.ApplyTemplate(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String, recovery.Template); err != nil {
+	if err = op.Media.ApplyTemplate(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String, recovery.Template); err != nil {
 		return err
 	}
 	if err = s.store.CompleteTemplateRecovery(ctx, id); err != nil && !s.accountCompletionConfirmed(parent, id, reg.ExternalUserID.String) {
@@ -105,7 +122,12 @@ func (s *Server) claimAccountOperations(ids ...int64) (func(), error) {
 	}, nil
 }
 
-func (s *Server) secureIncompleteAccount(parent context.Context, settings db.Settings, id int64, userID string) {
+func (s *Server) secureIncompleteAccount(parent context.Context, id int64, userID string) {
+	op, err := operationSnapshot(parent)
+	if err != nil {
+		return
+	}
+	settings := op.Settings
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(parent), accountCleanupTimeout)
 	defer cancel()
 	if err := s.store.RequireAccountCleanup(ctx, id, userID); err != nil {
@@ -117,7 +139,7 @@ func (s *Server) secureIncompleteAccount(parent context.Context, settings db.Set
 			return
 		}
 	}
-	err := s.media.DisableUser(ctx, settings.ServerURL, settings.APIKey, userID)
+	err = op.Media.DisableUser(ctx, settings.ServerURL, settings.APIKey, userID)
 	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer persistCancel()
 	var recordErr error
@@ -138,10 +160,18 @@ func userAbsent(err error) bool {
 	return errors.Is(err, mediaserver.ErrUserNotFound) || (errors.As(err, &httpErr) && httpErr.StatusCode == 404)
 }
 
-func (s *Server) disableAccount(parent context.Context, settings db.Settings, reg db.Registration) error {
+func (s *Server) disableAccount(parent context.Context, reg db.Registration) error {
+	op, err := operationSnapshot(parent)
+	if err != nil {
+		return err
+	}
+	if reg.BindingID != op.Identity.Binding.ID {
+		return db.ErrConnectionChanged
+	}
+	settings := op.Settings
 	ctx, cancel := context.WithTimeout(parent, accountCleanupTimeout)
 	defer cancel()
-	err := s.media.DisableUser(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String)
+	err = op.Media.DisableUser(ctx, settings.ServerURL, settings.APIKey, reg.ExternalUserID.String)
 	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(parent), 5*time.Second)
 	defer persistCancel()
 	if err != nil && !userAbsent(err) {
@@ -160,4 +190,21 @@ func (s *Server) disableAccount(parent context.Context, settings db.Settings, re
 	}
 	s.notify(webhookNotice{Event: "user.disabled", Title: title, Color: 0x2ecc71, Fields: map[string]string{"Username": reg.Username, "Registration": strconv.FormatInt(reg.ID, 10)}})
 	return nil
+}
+
+// The server-scoped account gate also covers separately imported/history rows
+// that refer to the same upstream account.
+func (s *Server) claimMediaUser(bindingID int64, userID string) (func(), error) {
+	key := strconv.FormatInt(bindingID, 10) + ":" + userID
+	s.accountMu.Lock()
+	defer s.accountMu.Unlock()
+	if s.closing || s.activeUsers[key] {
+		return nil, db.ErrRegistrationTransition
+	}
+	if s.activeUsers == nil {
+		s.activeUsers = map[string]bool{}
+	}
+	s.activeUsers[key] = true
+	s.accountWG.Add(1)
+	return func() { s.accountMu.Lock(); delete(s.activeUsers, key); s.accountMu.Unlock(); s.accountWG.Done() }, nil
 }

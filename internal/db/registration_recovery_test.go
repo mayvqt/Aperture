@@ -17,11 +17,11 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-recovery", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-recovery", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrationID, snapshot, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	registrationID, snapshot, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	recovery, err := store.ClaimTemplateRecovery(ctx, registrationID, false)
+	recovery, err := store.ClaimTemplateRecovery(ctx, registrationID, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	if recovery.UserExpiryDays != 7 || recovery.Registration.ExternalUserID.String != "jf-alice" {
 		t.Fatalf("recovery metadata = %#v", recovery)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, registrationID, false); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, registrationID, 1, false); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("concurrent ClaimTemplateRecovery error = %v", err)
 	}
 	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET updated_at = datetime('now', '-1 hour') WHERE id = ?`, registrationID); err != nil {
@@ -69,7 +69,7 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 	if reconciled.FlaggedAmbiguous != 1 {
 		t.Fatalf("retry reconciliation = %#v", reconciled)
 	}
-	recovery, err = store.ClaimTemplateRecovery(ctx, registrationID, false)
+	recovery, err = store.ClaimTemplateRecovery(ctx, registrationID, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,22 +83,22 @@ func TestTemplateRecoveryUsesReservationSnapshot(t *testing.T) {
 
 func TestReconcileStaleRegistrationsReleasesOnlySafeReservations(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-reconcile", TemplateID: 1, MaxUses: 4})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-reconcile", TemplateID: 1, MaxUses: 4, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	reservedID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "reserved")
+	reservedID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "reserved")
 	if err != nil {
 		t.Fatal(err)
 	}
-	creatingID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "creating")
+	creatingID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "creating")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := store.BeginUserCreation(ctx, creatingID); err != nil {
 		t.Fatal(err)
 	}
-	applyingID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "applying")
+	applyingID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "applying")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestReconcileStaleRegistrationsReleasesOnlySafeReservations(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, applyingID, "jf-applying"); err != nil {
 		t.Fatal(err)
 	}
-	legacyID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "legacy")
+	legacyID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "legacy")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,12 +10,20 @@ import (
 )
 
 func (s *Server) registrationsList(w http.ResponseWriter, r *http.Request, session db.Session) {
-	regs, err := s.store.RecentRegistrations(r.Context(), 100)
+	before := historyCursor(r)
+	review := r.URL.Query().Get("review") == "1"
+	regs, err := s.store.RegistrationPage(r.Context(), session.BindingID, before, review, 51)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
 	data := s.data(r, session)
+	data.HistoryBefore = before
+	data.ReviewOnly = review
+	if len(regs) > 50 {
+		regs = regs[:50]
+		data.NextBefore = regs[49].ID
+	}
 	data.Registrations = regs
 	render(w, "registrations", data)
 }
@@ -35,7 +43,7 @@ func (s *Server) registrationsRetryTemplate(w http.ResponseWriter, r *http.Reque
 		s.message(w, "API key required", "Save a media-server API key before retrying template application.", http.StatusConflict)
 		return
 	}
-	if err := s.recoverAccount(r.Context(), settings, id, false); err != nil {
+	if err := s.recoverAccount(r.Context(), id, false); err != nil {
 		if errors.Is(err, db.ErrNotFound) || errors.Is(err, db.ErrRegistrationTransition) {
 			s.registrationRecoveryError(w, err)
 		} else {
@@ -58,6 +66,15 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 		s.registrationRecoveryError(w, err)
 		return
 	}
+	op, err := operationSnapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	if registration.BindingID != op.Identity.Binding.ID {
+		s.message(w, "Server review needed", "Assign this registration to the correct server before managing its account.", http.StatusConflict)
+		return
+	}
 	deletedUpstream := false
 	if registration.ExternalUserID.Valid && strings.TrimSpace(registration.ExternalUserID.String) != "" {
 		settings, err := s.settings(r.Context())
@@ -69,7 +86,7 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 			s.message(w, "API key required", "Aperture must verify that the media-server user has been deleted first.", http.StatusConflict)
 			return
 		}
-		deletedUpstream, err = s.deleteUserAndRecords(r.Context(), settings, registration.ExternalUserID.String)
+		deletedUpstream, err = s.deleteUserAndRecords(r.Context(), registration.ExternalUserID.String)
 		if err != nil {
 			s.userDeleteError(w, err, deletedUpstream)
 			return

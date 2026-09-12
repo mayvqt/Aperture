@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mayvqt/aperture/internal/connection"
+	"github.com/mayvqt/aperture/internal/db"
 	"github.com/mayvqt/aperture/internal/mediaserver"
 )
 
@@ -54,6 +56,12 @@ func (s *Server) setupPost(w http.ResponseWriter, r *http.Request) {
 	// A waiting setup request must recheck completion before changing providers.
 	s.setupMu.Lock()
 	defer s.setupMu.Unlock()
+	current, err := s.connections.Current(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	r = r.WithContext(connection.WithSnapshot(r.Context(), current))
 	complete, err := s.setupComplete(r.Context())
 	if err != nil {
 		s.error(w, err)
@@ -106,33 +114,13 @@ func (s *Server) setupPost(w http.ResponseWriter, r *http.Request) {
 		s.renderSetupError(w, r, string(provider), publicURL, serverURL, err.Error())
 		return
 	}
-	previousProvider, _, _ := s.runtimeSettings()
-	restoreProvider := func() {
-		if previous, ok := mediaserver.ParseProvider(previousProvider); ok {
-			_ = s.media.SetProvider(previous)
-		}
-	}
-	if err := s.media.SetProvider(provider); err != nil {
-		s.renderSetupError(w, r, string(provider), publicURL, serverURL, "Could not select that media server.")
+	target := current.Settings
+	target.Provider, target.PublicURL, target.ServerURL, target.APIKey = string(provider), publicURL, serverURL, apiKey
+	update := s.settingsUpdate(target, true)
+	if _, err := s.connections.Publish(r.Context(), current, target, update); err != nil {
+		s.renderSetupError(w, r, string(provider), publicURL, serverURL, "Could not verify or save that media-server connection. Check the connection details and try again.")
 		return
 	}
-	if apiKey != "" {
-		if err := s.media.Ping(r.Context(), serverURL, apiKey); err != nil {
-			restoreProvider()
-			s.renderSetupError(w, r, string(provider), publicURL, serverURL, "Could not reach the media server with that API key.")
-			return
-		}
-	}
-	if err := s.store.UpdateSetupSettings(r.Context(), string(provider), publicURL, serverURL, apiKey); err != nil {
-		restoreProvider()
-		s.error(w, err)
-		return
-	}
-	cookieSecure := strings.HasPrefix(publicURL, "https://")
-	if s.cfg.CookieManaged {
-		cookieSecure = s.cfg.CookieSecure
-	}
-	s.setRuntime(string(provider), publicURL, cookieSecure)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 func (s *Server) loginForm(w http.ResponseWriter, r *http.Request) {
@@ -169,9 +157,19 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 		s.renderLoginFailure(w, r)
 		return
 	}
-	auth, err := s.media.Authenticate(r.Context(), settings.ServerURL, username, password)
+	snapshot, err := s.snapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	auth, err := snapshot.Media.Authenticate(r.Context(), settings.ServerURL, username, password)
 	if err != nil || !auth.IsAdmin {
 		s.renderLoginFailure(w, r)
+		return
+	}
+	verified, err := s.connections.Verify(r.Context(), snapshot, auth.AccessToken, auth.DeviceID)
+	if err != nil {
+		s.message(w, "Could not verify server", "Sign-in could not be completed because the media server changed or its identity could not be verified. Try again shortly.", http.StatusBadGateway)
 		return
 	}
 	s.limiter.Reset(rateKey)
@@ -179,7 +177,7 @@ func (s *Server) loginPost(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("remember_me") == "on" {
 		sessionTTL = rememberMeTTL
 	}
-	sessionID, _, err := s.store.CreateSession(r.Context(), auth.UserID, auth.Username, auth.AccessToken, auth.DeviceID, sessionTTL)
+	sessionID, _, err := s.store.CreateSession(r.Context(), db.SessionInput{UserID: auth.UserID, Username: auth.Username, AccessToken: auth.AccessToken, DeviceID: auth.DeviceID, TTL: sessionTTL, BindingID: verified.Identity.Binding.ID, Generation: verified.Identity.Generation})
 	if err != nil {
 		s.error(w, err)
 		return

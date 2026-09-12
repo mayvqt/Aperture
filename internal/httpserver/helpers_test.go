@@ -46,7 +46,7 @@ func TestClientIPRejectsSpoofedForwardedPrefix(t *testing.T) {
 
 func TestValidateBaseURL(t *testing.T) {
 	cfg := testConfig()
-	s := &Server{cfg: cfg, provider: cfg.MediaProvider}
+	s := &Server{cfg: cfg}
 	for _, value := range []string{"http://jellyfin:8096", "https://jellyfin.example"} {
 		if _, err := s.validateServerURL(value); err != nil {
 			t.Fatalf("validateBaseURL(%q) unexpected error: %v", value, err)

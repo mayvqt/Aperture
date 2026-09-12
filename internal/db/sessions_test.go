@@ -9,7 +9,7 @@ import (
 
 func TestSessionLifecycleEncryptsTokenAndExpires(t *testing.T) {
 	ctx, store := testStore(t)
-	sessionID, csrf, err := store.CreateSession(ctx, "jf-user", "admin", "access-token", "device-id", time.Hour)
+	sessionID, csrf, err := store.CreateSession(ctx, SessionInput{UserID: "jf-user", Username: "admin", AccessToken: "access-token", DeviceID: "device-id", TTL: time.Hour, BindingID: 1, Generation: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestSessionLifecycleEncryptsTokenAndExpires(t *testing.T) {
 
 func TestCreateSessionRemovesExpiredSessions(t *testing.T) {
 	ctx, store := testStore(t)
-	expiredID, _, err := store.CreateSession(ctx, "old-user", "old-admin", "old-token", "old-device", time.Hour)
+	expiredID, _, err := store.CreateSession(ctx, SessionInput{UserID: "old-user", Username: "old-admin", AccessToken: "old-token", DeviceID: "old-device", TTL: time.Hour, BindingID: 1, Generation: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestCreateSessionRemovesExpiredSessions(t *testing.T) {
 		t.Fatalf("expired Session error = %v, want ErrNotFound", err)
 	}
 
-	if _, _, err := store.CreateSession(ctx, "new-user", "new-admin", "new-token", "new-device", time.Hour); err != nil {
+	if _, _, err := store.CreateSession(ctx, SessionInput{UserID: "new-user", Username: "new-admin", AccessToken: "new-token", DeviceID: "new-device", TTL: time.Hour, BindingID: 1, Generation: 1}); err != nil {
 		t.Fatal(err)
 	}
 	var count int
@@ -114,13 +114,13 @@ func TestExpiredSessionCleanupIsBoundedAndContinues(t *testing.T) {
 		}
 		return count
 	}
-	if _, _, err := store.CreateSession(ctx, "new-user", "new-admin", "new-token", "new-device-1", time.Hour); err != nil {
+	if _, _, err := store.CreateSession(ctx, SessionInput{UserID: "new-user", Username: "new-admin", AccessToken: "new-token", DeviceID: "new-device-1", TTL: time.Hour, BindingID: 1, Generation: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if got := remaining(); got != 1 {
 		t.Fatalf("expired sessions after first bounded cleanup = %d, want 1", got)
 	}
-	if _, _, err := store.CreateSession(ctx, "new-user", "new-admin", "new-token", "new-device-2", time.Hour); err != nil {
+	if _, _, err := store.CreateSession(ctx, SessionInput{UserID: "new-user", Username: "new-admin", AccessToken: "new-token", DeviceID: "new-device-2", TTL: time.Hour, BindingID: 1, Generation: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if got := remaining(); got != 0 {

@@ -98,6 +98,18 @@ func (c *Client) Ping(ctx context.Context, baseURL, apiKey string) error {
 	return c.DoJSON(ctx, baseURL, http.MethodGet, "/System/Info", apiKey, nil, nil)
 }
 
+func (c *Client) Inspect(ctx context.Context, baseURL, token, deviceID string) (mediaserver.ServerInfo, error) {
+	var info mediaserver.ServerInfo
+	if err := c.DoJSONForDevice(ctx, baseURL, http.MethodGet, "/System/Info", token, deviceID, nil, &info); err != nil {
+		return mediaserver.ServerInfo{}, err
+	}
+	info.ID = strings.TrimSpace(info.ID)
+	if info.ID == "" {
+		return mediaserver.ServerInfo{}, errors.New("media-server identity response was incomplete")
+	}
+	return info, nil
+}
+
 func (c *Client) DisableUser(ctx context.Context, baseURL, apiKey, userID string) error {
 	var user struct {
 		Policy json.RawMessage `json:"Policy"`

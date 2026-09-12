@@ -18,7 +18,7 @@ const registrationProvisioningTimeout = 2 * time.Minute
 
 func (s *Server) publicInvite(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	invite, err := s.validInvite(r.Context(), token)
+	invite, err := s.lookupInvite(r.Context(), token)
 	if err != nil {
 		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
 		return
@@ -56,7 +56,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
-	invite, err := s.validInvite(r.Context(), token)
+	invite, err := s.lookupInvite(r.Context(), token)
 	if err != nil {
 		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
 		return
@@ -70,6 +70,17 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		render(w, "public-invite", viewData{AuthTitle: "Create account · Aperture", Token: token, CSRF: csrf, Invite: invite, FormUsername: username, Error: validationError})
 		return
 	}
+	ctx, err := s.verifiedAPIContext(r.Context())
+	if err != nil {
+		s.message(w, "Registration unavailable", "Aperture could not verify the media server. Ask the server admin to check the connection.", http.StatusServiceUnavailable)
+		return
+	}
+	r = r.WithContext(ctx)
+	invite, err = s.validInvite(r.Context(), token)
+	if err != nil {
+		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
+		return
+	}
 	settings, err := s.settings(r.Context())
 	if err != nil {
 		s.error(w, err)
@@ -79,7 +90,12 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.message(w, "Registration unavailable", "Ask the server admin to finish configuring account registration.", http.StatusServiceUnavailable)
 		return
 	}
-	regID, template, err := s.store.ReserveInviteUse(r.Context(), invite.ID, remoteIP, requestUserAgent(r), username)
+	op, err := operationSnapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	regID, template, err := s.store.ReserveInviteUse(r.Context(), invite.ID, invite.BindingID, remoteIP, requestUserAgent(r), username)
 	if err != nil {
 		if errors.Is(err, db.ErrInviteUnavailable) {
 			s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusConflict)
@@ -103,7 +119,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.error(w, err)
 		return
 	}
-	user, err := s.media.CreateUser(r.Context(), settings.ServerURL, settings.APIKey, username, password, func(user mediaserver.User) error {
+	user, err := op.Media.CreateUser(r.Context(), settings.ServerURL, settings.APIKey, username, password, func(user mediaserver.User) error {
 		persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
 		defer persistCancel()
 		return s.store.RecordProvisioningUser(persistCtx, regID, user.ID)
@@ -114,7 +130,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 			if provisioned {
 				return
 			}
-			s.secureIncompleteAccount(r.Context(), settings, regID, user.ID)
+			s.secureIncompleteAccount(r.Context(), regID, user.ID)
 		}()
 	}
 	if err != nil {
@@ -140,7 +156,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.error(w, err)
 		return
 	}
-	if err := s.media.ApplyTemplate(r.Context(), settings.ServerURL, settings.APIKey, user.ID, template); err != nil {
+	if err := op.Media.ApplyTemplate(r.Context(), settings.ServerURL, settings.APIKey, user.ID, template); err != nil {
 		if recordErr := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationNeedsAttention, safeError(err)); recordErr != nil {
 			slog.Error("could not record partial media-server registration", "registration_id", regID, "error", safeError(recordErr))
 		}

@@ -3,27 +3,32 @@ package httpserver
 import "github.com/mayvqt/aperture/internal/db"
 
 type viewData struct {
-	Admin            bool
-	Username         string
-	CSRF             string
-	Error            string
-	Message          string
-	Title            string
-	AuthTitle        string
-	CurrentPage      string
-	ServerName       string
-	Provider         string
-	ServerURL        string
-	ProviderManaged  bool
-	PublicURLManaged bool
-	ServerURLManaged bool
-	APIKeyManaged    bool
-	CookieManaged    bool
-	Template         db.Template
-	Templates        []db.Template
-	Invites          []db.Invite
-	InviteRows       []inviteRow
-	Invite           db.Invite
+	BindingID                 int64
+	HistoryBefore, NextBefore int64
+	ReviewOnly                bool
+	Review                    serverReview
+	ManagedHistory            []db.ManagedUser
+	Admin                     bool
+	Username                  string
+	CSRF                      string
+	Error                     string
+	Message                   string
+	Title                     string
+	AuthTitle                 string
+	CurrentPage               string
+	ServerName                string
+	Provider                  string
+	ServerURL                 string
+	ProviderManaged           bool
+	PublicURLManaged          bool
+	ServerURLManaged          bool
+	APIKeyManaged             bool
+	CookieManaged             bool
+	Template                  db.Template
+	Templates                 []db.Template
+	Invites                   []db.Invite
+	InviteRows                []inviteRow
+	Invite                    db.Invite
 	// InviteExpiryChoice preserves the submitted selector when rendering a
 	// validation error; parsed expiry timestamps alone cannot distinguish a
 	// quick choice from a custom date.

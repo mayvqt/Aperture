@@ -45,6 +45,8 @@ func (s *Server) settingsForm(w http.ResponseWriter, r *http.Request, session db
 	render(w, "settings", data)
 }
 func (s *Server) settingsPost(w http.ResponseWriter, r *http.Request, session db.Session) {
+	s.setupMu.Lock()
+	defer s.setupMu.Unlock()
 	if err := r.ParseForm(); err != nil {
 		s.message(w, "Invalid request", "The settings form could not be read.", http.StatusBadRequest)
 		return
@@ -99,51 +101,21 @@ func (s *Server) settingsPost(w http.ResponseWriter, r *http.Request, session db
 	} else if apiKey == "" {
 		effectiveAPIKey = current.APIKey
 	}
-	previousProvider, _, _ := s.runtimeSettings()
-	restoreProvider := func() {
-		if previous, ok := mediaserver.ParseProvider(previousProvider); ok {
-			_ = s.media.SetProvider(previous)
-		}
-	}
-	if err := s.media.SetProvider(provider); err != nil {
-		s.renderSettingsError(w, r, session, string(provider), publicURL, serverURL, "Could not select that media server.")
+	expected, err := s.snapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
 		return
 	}
-	if effectiveAPIKey != "" {
-		if err := s.media.Ping(r.Context(), serverURL, effectiveAPIKey); err != nil {
-			restoreProvider()
-			s.renderSettingsError(w, r, session, string(provider), publicURL, serverURL, "Could not reach the media server with those connection details.")
-			return
-		}
+	target := current
+	target.Provider, target.PublicURL, target.ServerURL, target.APIKey = string(provider), publicURL, serverURL, effectiveAPIKey
+	update := s.settingsUpdate(target, apiKey != "" || removeAPIKey)
+	published, err := s.connections.Publish(r.Context(), expected, target, update)
+	if err != nil {
+		s.renderSettingsError(w, r, session, string(provider), publicURL, serverURL, "Could not verify or save this connection. Refresh the page, check the details, and try again.")
+		return
 	}
-	var providerUpdate, publicURLUpdate, serverURLUpdate, apiKeyUpdate *string
-	if !s.cfg.ProviderManaged {
-		value := string(provider)
-		providerUpdate = &value
-	}
-	if !s.cfg.PublicURLManaged {
-		publicURLUpdate = &publicURL
-	}
-	if !s.cfg.ServerURLManaged {
-		serverURLUpdate = &serverURL
-	}
-	if !s.cfg.APIKeyManaged && (apiKey != "" || removeAPIKey) {
-		apiKeyUpdate = &apiKey
-	}
-	if providerUpdate != nil || publicURLUpdate != nil || serverURLUpdate != nil || apiKeyUpdate != nil {
-		if err := s.store.UpdateApplicationSettings(r.Context(), providerUpdate, publicURLUpdate, serverURLUpdate, apiKeyUpdate); err != nil {
-			restoreProvider()
-			s.error(w, err)
-			return
-		}
-	}
-	cookieSecure := strings.HasPrefix(publicURL, "https://")
-	if s.cfg.CookieManaged {
-		cookieSecure = s.cfg.CookieSecure
-	}
-	s.setRuntime(string(provider), publicURL, cookieSecure)
-	s.audit(r, session, "settings.update", "settings", "application", map[string]any{"provider": string(provider), "public_url": publicURL, "server_url": serverURL, "api_key_changed": apiKeyUpdate != nil})
-	if current.Provider != string(provider) || current.ServerURL != serverURL {
+	s.audit(r, session, "settings.update", "settings", "application", map[string]any{"provider": string(provider), "public_url": publicURL, "server_url": serverURL, "api_key_changed": update.APIKey != nil})
+	if published.Identity.Generation != session.Generation {
 		s.clearSession(w, r, session.ID)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
@@ -168,4 +140,21 @@ func (s *Server) renderSettingsError(w http.ResponseWriter, r *http.Request, ses
 	data.ServerURL = serverURL
 	s.setMediaViewData(&data)
 	render(w, "settings", data)
+}
+
+func (s *Server) settingsUpdate(target db.Settings, replaceKey bool) db.ConnectionUpdate {
+	var update db.ConnectionUpdate
+	if !s.cfg.ProviderManaged {
+		update.Provider = &target.Provider
+	}
+	if !s.cfg.PublicURLManaged {
+		update.PublicURL = &target.PublicURL
+	}
+	if !s.cfg.ServerURLManaged {
+		update.ServerURL = &target.ServerURL
+	}
+	if !s.cfg.APIKeyManaged && replaceKey {
+		update.APIKey = &target.APIKey
+	}
+	return update
 }

@@ -37,3 +37,10 @@ reservation transaction and retained through failures and recovery. Migration
 preserves existing deadlines and reconstructs missing finite deadlines from the
 original registration time and retained invite duration. Incomplete accounts
 with known upstream IDs enter cleanup independently of access retry attempts.
+
+Revision 6 adds server ownership using provider, normalized URL and the authenticated
+server ID. Existing invite, registration and tracked-user rows retain their data
+with unknown ownership until an administrator reviews each record. Connection
+publication atomically saves settings and revokes sessions on an origin change.
+Reassigning an account preserves its deadline and resets the old server's disable
+acknowledgement so expired access is checked again.

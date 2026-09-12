@@ -32,8 +32,8 @@ type pausedReservationStore struct {
 	entered, release chan struct{}
 }
 
-func (s *pausedReservationStore) ReserveInviteUse(ctx context.Context, id int64, ip, ua, username string) (int64, db.Template, error) {
-	reg, tmpl, err := s.fakeStore.ReserveInviteUse(ctx, id, ip, ua, username)
+func (s *pausedReservationStore) ReserveInviteUse(ctx context.Context, id, bindingID int64, ip, ua, username string) (int64, db.Template, error) {
+	reg, tmpl, err := s.fakeStore.ReserveInviteUse(ctx, id, bindingID, ip, ua, username)
 	close(s.entered)
 	<-s.release
 	return reg, tmpl, err
@@ -42,7 +42,7 @@ func (s *pausedReservationStore) ReserveInviteUse(ctx context.Context, id int64,
 func TestShutdownWaitsForReservationAndRejectsLateProvisioning(t *testing.T) {
 	store := &pausedReservationStore{fakeStore: newFakeStore(), entered: make(chan struct{}), release: make(chan struct{})}
 	media := &fakeMediaServer{}
-	s := NewServer(testConfig(), store, media)
+	s := NewServer(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {"csrf"}, "username": {"new_user"}, "password": {"correct horse"}, "confirm_password": {"correct horse"}}
 	req := httptest.NewRequest(http.MethodPost, "/i/token/register", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -93,8 +93,8 @@ func TestRecoveryPreservesFailureAlertsAndCleanupMeaning(t *testing.T) {
 	store.webhooks = []db.Webhook{{URL: "http://webhook.test/events", Kind: "generic", Enabled: true, Events: "template.failed,user.disable_failed,user.disabled"}}
 	store.recovery.Registration.TemplateAttempts = 5
 	media := &fakeMediaServer{applyErr: errors.New("response lost"), disableErr: errors.New("offline")}
-	s := NewServer(testConfig(), store, media)
-	if err := s.recoverAccount(t.Context(), store.settings, 1, true); err == nil {
+	s := NewServer(testConfig(), store, testMediaFactory(media))
+	if err := s.recoverAccount(verifiedTestContext(t, s), 1, true); err == nil {
 		t.Fatal("expected template failure")
 	}
 	if err := s.waitForWebhooks(t.Context()); err != nil {
@@ -114,7 +114,7 @@ func TestRecoveryPreservesFailureAlertsAndCleanupMeaning(t *testing.T) {
 	media.disableErr = nil
 	r := store.recovery.Registration
 	r.UserDisableAt = sql.NullTime{Time: time.Now().Add(time.Hour), Valid: true}
-	if err := s.disableAccount(t.Context(), store.settings, r); err != nil {
+	if err := s.disableAccount(verifiedTestContext(t, s), r); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.waitForWebhooks(t.Context()); err != nil {
@@ -126,10 +126,10 @@ func TestRecoveryPreservesFailureAlertsAndCleanupMeaning(t *testing.T) {
 }
 
 func TestCommittedRecoveryIsNotDisabledWhenAcknowledgementFails(t *testing.T) {
-	store, settings, id := recoveryFixture(t)
+	store, _, id := recoveryFixture(t)
 	media := &fakeMediaServer{}
-	s := NewServer(testConfig(), acknowledgementFailureStore{store}, media)
-	if err := s.recoverAccount(t.Context(), settings, id, false); err != nil {
+	s := NewServer(testConfig(), acknowledgementFailureStore{store}, testMediaFactory(media))
+	if err := s.recoverAccount(verifiedTestContext(t, s), id, false); err != nil {
 		t.Fatalf("confirmed completion reported failure: %v", err)
 	}
 	r, err := store.Registration(t.Context(), id)
@@ -142,11 +142,11 @@ func TestCommittedRecoveryIsNotDisabledWhenAcknowledgementFails(t *testing.T) {
 }
 
 func TestFailedPolicyResponseLeavesDurableCleanupAfterRetryLimit(t *testing.T) {
-	store, settings, id := recoveryFixture(t)
+	store, _, id := recoveryFixture(t)
 	media := &fakeMediaServer{applyErr: errors.New("policy response lost"), disableErr: errors.New("offline")}
-	s := NewServer(testConfig(), store, media)
+	s := NewServer(testConfig(), store, testMediaFactory(media))
 	for i := 0; i < 6; i++ {
-		if err := s.recoverAccount(t.Context(), settings, id, false); err == nil {
+		if err := s.recoverAccount(verifiedTestContext(t, s), id, false); err == nil {
 			t.Fatal("expected policy failure")
 		}
 	}
@@ -157,12 +157,12 @@ func TestFailedPolicyResponseLeavesDurableCleanupAfterRetryLimit(t *testing.T) {
 	if r.TemplateAttempts != 6 || !r.CleanupPending || r.DisableAttempts != 6 || !r.NextDisableAttemptAt.Valid {
 		t.Fatalf("cleanup lost: %+v", r)
 	}
-	if ids, err := store.ListDueTemplateRecoveryIDs(t.Context(), 10); err != nil || len(ids) > 0 {
+	if ids, err := store.ListDueTemplateRecoveryIDs(t.Context(), 1, 10); err != nil || len(ids) > 0 {
 		t.Fatalf("exhausted retries=%v %v", ids, err)
 	}
 	// Retry only the security cleanup using the same persisted registration.
 	media.disableErr = nil
-	if err := s.disableAccount(t.Context(), settings, r); err != nil {
+	if err := s.disableAccount(verifiedTestContext(t, s), r); err != nil {
 		t.Fatal(err)
 	}
 	r, err = store.Registration(t.Context(), id)
@@ -178,8 +178,8 @@ func TestExpiredRecoveryOnlyAttemptsDisable(t *testing.T) {
 	store := newFakeStore()
 	store.recovery.Registration.UserDisableAt = sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true}
 	media := &fakeMediaServer{disableErr: errors.New("offline")}
-	s := NewServer(testConfig(), store, media)
-	if err := s.recoverAccount(t.Context(), store.settings, 1, false); err == nil {
+	s := NewServer(testConfig(), store, testMediaFactory(media))
+	if err := s.recoverAccount(verifiedTestContext(t, s), 1, false); err == nil {
 		t.Fatal("expected disable failure")
 	}
 	if media.appliedTemplate || store.recoveryFailure != "" || store.failedDisableID != 1 || store.recordedUserID != "" {
@@ -188,7 +188,7 @@ func TestExpiredRecoveryOnlyAttemptsDisable(t *testing.T) {
 }
 
 func TestAccountOperationGuardsAreScopedAndReleased(t *testing.T) {
-	s := NewServer(testConfig(), newFakeStore(), &fakeMediaServer{})
+	s := NewServer(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{}))
 	release, err := s.claimAccountOperations(1, 2)
 	if err != nil {
 		t.Fatal(err)
@@ -223,18 +223,23 @@ func recoveryFixture(t *testing.T) (*db.Store, db.Settings, int64) {
 	if err := store.InitSchema(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.UpdateSetupSettings(ctx, "jellyfin", "http://aperture.test", "http://media.test", "synthetic-key"); err != nil {
-		t.Fatal(err)
+	for key, value := range map[string]string{"media_provider": "jellyfin", "public_url": "https://join.test", "server_url": "http://media.test", "api_key": "synthetic-key"} {
+		if err := store.SetSetting(ctx, key, value, key == "api_key"); err != nil {
+			t.Fatal(err)
+		}
 	}
 	settings, err := store.Settings(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	inviteID, err := store.CreateInvite(ctx, db.Invite{TokenHash: "retry-fixture", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7})
+	if _, err := store.PublishMediaConnection(ctx, db.ConnectionUpdate{Origin: db.MediaBinding{Provider: "jellyfin", BaseURL: "http://media:8096", ServerID: "synthetic-server"}}); err != nil {
+		t.Fatal(err)
+	}
+	inviteID, err := store.CreateInvite(ctx, db.Invite{TokenHash: "retry-fixture", TemplateID: 1, MaxUses: 1, UserExpiryDays: 7, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, _, err := store.ReserveInviteUse(ctx, inviteID, "", "", "alice")
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "", "", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}

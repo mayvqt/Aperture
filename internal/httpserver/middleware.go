@@ -22,9 +22,8 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; form-action 'self'; frame-ancestors 'none'")
 		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("X-Frame-Options", "DENY")
-		s.runtimeMu.RLock()
-		hstsHost := s.hstsHost
-		s.runtimeMu.RUnlock()
+		_, publicURL, _ := s.runtimeSettings()
+		hstsHost := securePublicHost(publicURL)
 		if hstsHost != "" && strings.EqualFold(hstsHost, r.Host) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}

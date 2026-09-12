@@ -11,17 +11,22 @@ import (
 	"time"
 
 	"github.com/mayvqt/aperture/internal/config"
+	"github.com/mayvqt/aperture/internal/connection"
 	"github.com/mayvqt/aperture/internal/db"
 	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/security"
 )
 
-func (s *Server) validInvite(ctx context.Context, token string) (db.Invite, error) {
-	settings, err := s.settings(ctx)
+func (s *Server) lookupInvite(ctx context.Context, token string) (db.Invite, error) {
+	snapshot, err := s.snapshot(ctx)
 	if err != nil {
 		return db.Invite{}, err
 	}
-	invite, err := s.store.InviteByHash(ctx, security.HashToken(settings.InviteSecret, token))
+	if snapshot.Identity.Binding.ID <= 0 {
+		return db.Invite{}, db.ErrInviteUnavailable
+	}
+	settings := snapshot.Settings
+	invite, err := s.store.InviteByHash(ctx, security.HashToken(settings.InviteSecret, token), snapshot.Identity.Binding.ID)
 	if err != nil {
 		return db.Invite{}, err
 	}
@@ -31,43 +36,55 @@ func (s *Server) validInvite(ctx context.Context, token string) (db.Invite, erro
 	}
 	return invite, nil
 }
+func (s *Server) validInvite(ctx context.Context, token string) (db.Invite, error) {
+	if _, err := operationSnapshot(ctx); err != nil {
+		return db.Invite{}, err
+	}
+	return s.lookupInvite(ctx, token)
+}
 func (s *Server) serverName() string {
 	value, _, _ := s.runtimeSettings()
 	provider, _ := mediaserver.ParseProvider(value)
 	return provider.Name()
 }
-func (s *Server) settings(ctx context.Context) (db.Settings, error) {
-	settings, err := s.store.Settings(ctx)
-	if err != nil {
-		return db.Settings{}, err
+func (s *Server) snapshot(ctx context.Context) (connection.Snapshot, error) {
+	if snapshot, ok := connection.FromContext(ctx); ok {
+		return snapshot, nil
 	}
-	if s.cfg.ProviderManaged {
-		settings.Provider = s.cfg.MediaProvider
-	}
-	if s.cfg.PublicURLManaged {
-		settings.PublicURL = s.cfg.PublicURL
-	}
-	if s.cfg.ServerURLManaged {
-		settings.ServerURL = s.cfg.ServerURL
-	}
-	if s.cfg.APIKey != "" {
-		settings.APIKey = s.cfg.APIKey
-	}
-	if s.cfg.SessionSecret != "" {
-		settings.SessionSecret = s.cfg.SessionSecret
-	}
-	if s.cfg.InviteSecret != "" {
-		settings.InviteSecret = s.cfg.InviteSecret
-	}
-	return settings, nil
+	return s.connections.Current(ctx)
 }
+
+func (s *Server) settings(ctx context.Context) (db.Settings, error) {
+	snapshot, err := s.snapshot(ctx)
+	return snapshot.Settings, err
+}
+
+func operationSnapshot(ctx context.Context) (connection.Snapshot, error) {
+	snapshot, ok := connection.FromContext(ctx)
+	if !ok || !snapshot.Verified || snapshot.Identity.Binding.ID <= 0 {
+		return connection.Snapshot{}, connection.ErrUnavailable
+	}
+	return snapshot, nil
+}
+
+func (s *Server) verifiedAPIContext(ctx context.Context) (context.Context, error) {
+	snapshot, err := s.snapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	verified, err := s.connections.Verify(ctx, snapshot, snapshot.Settings.APIKey, "aperture")
+	if err != nil {
+		return nil, err
+	}
+	return connection.WithSnapshot(ctx, verified), nil
+}
+
 func (s *Server) setupComplete(ctx context.Context) (bool, error) {
 	settings, err := s.settings(ctx)
 	if err != nil {
 		return false, err
 	}
-	_, publicURL, _ := s.runtimeSettings()
-	return settings.Provider != "" && settings.ServerURL != "" && publicURL != "", nil
+	return settings.Provider != "" && settings.ServerURL != "" && settings.PublicURL != "", nil
 }
 func (s *Server) message(w http.ResponseWriter, title, message string, status int) {
 	renderStatus(w, "message", viewData{AuthTitle: "Message · Aperture", Title: title, Message: message}, status)
@@ -207,4 +224,25 @@ func safeAdminImportError(err error) string {
 	default:
 		return "Aperture could not import that media-server user's template: " + msg
 	}
+}
+
+// A maintenance batch may span minutes. Verify each new account operation,
+// stopping the old batch if a replacement or settings change occurred.
+func (s *Server) refreshAccountContext(ctx context.Context) (context.Context, error) {
+	previous, err := operationSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+	fresh, err := s.verifiedAPIContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	current, err := operationSnapshot(fresh)
+	if err != nil {
+		return nil, err
+	}
+	if current.Identity.Binding.ID != previous.Identity.Binding.ID || current.Identity.Generation != previous.Identity.Generation {
+		return nil, db.ErrConnectionChanged
+	}
+	return fresh, nil
 }
