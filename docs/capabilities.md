@@ -4,7 +4,7 @@ Aperture provides:
 
 - browser-based first-run configuration for Jellyfin or Emby;
 - administrator authentication through the configured media server;
-- reusable non-administrator policy templates, including import from an existing user;
+- reusable non-administrator policy templates that preserve target authentication defaults, including import from an existing user;
 - bounded, expiring invite links with usage limits and optional account expiry;
 - account creation, policy application, retry, disable, and recovery workflows;
 - managed-user and registration history views;

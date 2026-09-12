@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
@@ -9,6 +8,7 @@ import (
 
 	"github.com/mayvqt/aperture/internal/config"
 	"github.com/mayvqt/aperture/internal/db"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 )
 
 var usernamePattern = regexp.MustCompile(`^[A-Za-z0-9._-]{3,32}$`)
@@ -73,27 +73,11 @@ func cleanTemplate(t db.Template) (db.Template, error) {
 		//lint:ignore ST1005 This validation error is rendered directly to a user.
 		return db.Template{}, errors.New("Policy JSON is too large.")
 	}
-	policy, err := cleanJSONObject(t.PolicyJSON, db.TemplatePolicyDefaultJSON)
+	cleanPolicy, err := mediaserver.NormalizeTemplatePolicy(t.PolicyJSON)
 	if err != nil {
 		//lint:ignore ST1005 This validation error is rendered directly to a user.
-		return db.Template{}, errors.New("The policy JSON could not be parsed.")
+		return db.Template{}, errors.New("The policy must be a JSON object with unique property names and boolean access flags.")
 	}
-	policy["IsAdministrator"] = false
-	cleanPolicy, _ := json.Marshal(policy)
-	t.PolicyJSON = string(cleanPolicy)
+	t.PolicyJSON = cleanPolicy
 	return t, nil
-}
-func cleanJSONObject(value, fallback string) (map[string]any, error) {
-	value = strings.TrimSpace(value)
-	if value == "" || value == "null" {
-		value = fallback
-	}
-	var out map[string]any
-	if err := json.Unmarshal([]byte(value), &out); err != nil {
-		return nil, err
-	}
-	if out == nil {
-		out = map[string]any{}
-	}
-	return out, nil
 }

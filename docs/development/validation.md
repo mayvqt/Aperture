@@ -16,6 +16,10 @@ Format touched Go files with `gofmt -w`. Performance or refactor claims require 
 representative before/after benchmark or trace and a regression threshold; a
 clean test run alone is not performance evidence.
 
+Media-server policy fixtures cover complete target defaults, case-insensitive
+overrides, duplicate access flags, and disabling an account after an ambiguous
+failure. Keep these checks when changing template import or application.
+
 ## UI evidence
 
 Rebuild before visual checks because templates, CSS, and JavaScript are embedded.

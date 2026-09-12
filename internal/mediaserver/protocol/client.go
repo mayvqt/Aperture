@@ -105,14 +105,10 @@ func (c *Client) DisableUser(ctx context.Context, baseURL, apiKey, userID string
 	if err := c.DoJSON(ctx, baseURL, http.MethodGet, "/Users/"+url.PathEscape(userID), apiKey, nil, &user); err != nil {
 		return err
 	}
-	policy := map[string]any{}
-	if len(user.Policy) > 0 && string(user.Policy) != "null" {
-		if err := json.Unmarshal(user.Policy, &policy); err != nil {
-			return err
-		}
+	policy, err := mediaserver.MergeUserPolicy(user.Policy, "{}", true)
+	if err != nil {
+		return err
 	}
-	policy["IsAdministrator"] = false
-	policy["IsDisabled"] = true
 	return c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/"+url.PathEscape(userID)+"/Policy", apiKey, policy, nil)
 }
 
@@ -142,11 +138,17 @@ func (c *Client) DeleteUser(ctx context.Context, baseURL, apiKey, userID string)
 }
 
 func (c *Client) ApplyTemplate(ctx context.Context, baseURL, apiKey, userID string, tmpl db.Template) error {
-	var policy map[string]any
-	if err := json.Unmarshal([]byte(tmpl.PolicyJSON), &policy); err != nil {
+	user, found, err := c.GetUser(ctx, baseURL, apiKey, userID)
+	if err != nil {
 		return err
 	}
-	policy["IsAdministrator"] = false
+	if !found {
+		return mediaserver.ErrUserNotFound
+	}
+	policy, err := mediaserver.MergeUserPolicy(user.Policy, tmpl.PolicyJSON, false)
+	if err != nil {
+		return err
+	}
 	return c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/"+url.PathEscape(userID)+"/Policy", apiKey, policy, nil)
 }
 

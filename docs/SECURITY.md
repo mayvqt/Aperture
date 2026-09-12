@@ -25,6 +25,11 @@ the media server is reachable; failed cleanup requires administrator interventio
 Accounts with incomplete password setup retain their external ID for review and
 cannot be enabled through automatic or manual template-only retries.
 
+Template policies always disable administrator access, regardless of property
+casing. Conflicting property names are rejected. Applying a template preserves
+the target account's authentication and password-reset providers and merges its
+remaining defaults, so imported authentication settings do not cross accounts.
+
 Before upgrading an existing installation, review older `needs_attention`
 registrations in the media server, especially password-setup failures. Earlier
 records are not reclassified by this release. Keep any incomplete accounts

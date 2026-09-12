@@ -20,6 +20,9 @@ protocol details stay in `internal/mediaserver`.
 - Jellyfin and Emby request shapes and authorization are provider contracts.
   Verify changes against the supported upstream documentation and cover them
   with deterministic HTTP fixtures before any opt-in live smoke test.
+- Policy application reads the target user's complete policy before merging
+  template overrides. Shared normalization rejects ambiguous case aliases,
+  preserves target authentication providers, and forces non-administrator access.
 
 ## Security and concurrency boundaries
 

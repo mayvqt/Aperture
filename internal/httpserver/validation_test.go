@@ -45,3 +45,13 @@ func TestCleanTemplateBoundsDurableFields(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanTemplateProtectsCaseInsensitiveAdministratorFlag(t *testing.T) {
+	clean, err := cleanTemplate(db.Template{Name: "Family", PolicyJSON: `{"isAdministrator":true,"AuthenticationProviderId":"source"}`})
+	if err != nil || clean.PolicyJSON != `{"IsAdministrator":false}` {
+		t.Fatalf("template/error = %s/%v", clean.PolicyJSON, err)
+	}
+	if _, err := cleanTemplate(db.Template{Name: "Family", PolicyJSON: `{"IsAdministrator":false,"isAdministrator":true}`}); err == nil {
+		t.Fatal("accepted duplicate access flag")
+	}
+}
