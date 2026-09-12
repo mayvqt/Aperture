@@ -23,6 +23,8 @@ type fakeMediaServer struct {
 	applyErr        error
 	importErr       error
 	pingErr         error
+	inspectErr      error
+	inspectAPIKey   atomic.Value
 	pingCalls       atomic.Int32
 	pingStarted     chan struct{}
 	pingRelease     chan struct{}
@@ -34,9 +36,12 @@ type fakeMediaServer struct {
 	disableErr      error
 }
 
-func (f *fakeMediaServer) SetProvider(provider mediaserver.Provider) error {
-	f.provider = provider
-	return nil
+func (f *fakeMediaServer) Inspect(ctx context.Context, baseURL, token, deviceID string) (mediaserver.ServerInfo, error) {
+	f.inspectAPIKey.Store(token)
+	if err := f.inspectErr; err != nil && deviceID == "aperture" {
+		return mediaserver.ServerInfo{}, err
+	}
+	return mediaserver.ServerInfo{ID: "synthetic-server", Name: "Media"}, nil
 }
 
 func (f *fakeMediaServer) Authenticate(context.Context, string, string, string) (mediaserver.AuthResult, error) {
@@ -62,12 +67,12 @@ func (f *fakeMediaServer) Ping(_ context.Context, _, apiKey string) error {
 	}
 	return nil
 }
-func (f *fakeMediaServer) CreateUser(context.Context, string, string, string, string) (mediaserver.User, error) {
+func (f *fakeMediaServer) CreateUser(_ context.Context, _, _, _, _ string, created func(mediaserver.User) error) (mediaserver.User, error) {
 	f.createdUser = true
 	if f.createErr != nil {
 		return mediaserver.User{}, f.createErr
 	}
-	return mediaserver.User{ID: "new-media-user", Name: "new_user"}, nil
+	return mediaserver.User{ID: "new-media-user", Name: "new_user"}, created(mediaserver.User{ID: "new-media-user", Name: "new_user"})
 }
 func (f *fakeMediaServer) ApplyTemplate(_ context.Context, _, _, userID string, template db.Template) error {
 	f.appliedTemplate = true
@@ -101,6 +106,6 @@ func (f *fakeMediaServer) ImportTemplate(context.Context, string, string, string
 	return mediaserver.TemplateData{PolicyJSON: db.TemplatePolicyDefaultJSON}, nil
 }
 
-var _ MediaServer = (*fakeMediaServer)(nil)
+var _ mediaserver.Server = (*fakeMediaServer)(nil)
 
 var errFakePing = errors.New("ping failed")

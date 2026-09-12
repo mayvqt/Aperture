@@ -19,9 +19,20 @@ type Session struct {
 	DeviceID    string
 	CSRFSecret  string
 	ExpiresAt   time.Time
+	BindingID   int64
+	Generation  int64
 }
 
-func (s *Store) CreateSession(ctx context.Context, userID, username, accessToken, deviceID string, ttl time.Duration) (string, string, error) {
+type SessionInput struct {
+	UserID, Username, AccessToken, DeviceID string
+	TTL                                     time.Duration
+	BindingID, Generation                   int64
+}
+
+func (s *Store) CreateSession(ctx context.Context, input SessionInput) (string, string, error) {
+	if input.BindingID <= 0 {
+		return "", "", ErrConnectionChanged
+	}
 	now := time.Now().UTC()
 	sessionID, err := security.RandomToken(32)
 	if err != nil {
@@ -32,7 +43,7 @@ func (s *Store) CreateSession(ctx context.Context, userID, username, accessToken
 		return "", "", err
 	}
 	sessionHash := hashSessionID(sessionID)
-	encryptedAccessToken, err := s.encryptor.EncryptString(accessToken)
+	encryptedAccessToken, err := s.encryptor.EncryptString(input.AccessToken)
 	if err != nil {
 		return "", "", err
 	}
@@ -40,12 +51,18 @@ func (s *Store) CreateSession(ctx context.Context, userID, username, accessToken
 	if err != nil {
 		return "", "", err
 	}
-	_, err = s.db.ExecContext(ctx, `
-		INSERT INTO sessions (id, external_user_id, external_username, access_token, device_id, csrf_secret, expires_at, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-	`, sessionHash, userID, username, encryptedAccessToken, deviceID, encryptedCSRF, now.Add(ttl))
+	result, err := s.db.ExecContext(ctx, `
+		INSERT INTO sessions (id, external_user_id, external_username, access_token, device_id, csrf_secret, expires_at, binding_id, connection_generation, created_at)
+		SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+		FROM media_connection WHERE id=1 AND binding_id=? AND generation=?
+	`, sessionHash, input.UserID, input.Username, encryptedAccessToken, input.DeviceID, encryptedCSRF, now.Add(input.TTL), input.BindingID, input.Generation, input.BindingID, input.Generation)
 	if err != nil {
 		return "", "", err
+	}
+	if changed, err := result.RowsAffected(); err != nil {
+		return "", "", err
+	} else if changed != 1 {
+		return "", "", ErrConnectionChanged
 	}
 	_, _ = s.db.ExecContext(ctx, `
 		DELETE FROM sessions
@@ -62,10 +79,10 @@ func (s *Store) Session(ctx context.Context, id string) (Session, error) {
 	sessionHash := hashSessionID(id)
 	var session Session
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, external_user_id, external_username, access_token, device_id, csrf_secret, expires_at
+		SELECT id, external_user_id, external_username, access_token, device_id, csrf_secret, expires_at, COALESCE(binding_id,0),connection_generation
 		FROM sessions
 		WHERE id = ? AND expires_at > CURRENT_TIMESTAMP
-	`, sessionHash).Scan(&session.ID, &session.UserID, &session.Username, &session.AccessToken, &session.DeviceID, &session.CSRFSecret, &session.ExpiresAt)
+	`, sessionHash).Scan(&session.ID, &session.UserID, &session.Username, &session.AccessToken, &session.DeviceID, &session.CSRFSecret, &session.ExpiresAt, &session.BindingID, &session.Generation)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Session{}, ErrNotFound
 	}

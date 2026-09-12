@@ -14,14 +14,14 @@ import (
 
 func TestUsersPageMergesLiveImportedAndInviteUsers(t *testing.T) {
 	store := newFakeStore()
-	store.managedUsers = []db.ManagedUser{{ExternalUserID: "external-1", Username: "External"}}
-	store.registrations = []db.Registration{{ID: 7, ExternalUserID: sql.NullString{String: "invite-1", Valid: true}, Username: "Invite User"}}
+	store.managedUsers = []db.ManagedUser{{BindingID: 1, ExternalUserID: "external-1", Username: "External"}}
+	store.registrations = []db.Registration{{BindingID: 1, ID: 7, ExternalUserID: sql.NullString{String: "invite-1", Valid: true}, Username: "Invite User"}}
 	media := &fakeMediaServer{users: []mediaserver.User{
-		{ID: "external-1", Name: "External", Policy: []byte(`{"IsDisabled":false}`)},
-		{ID: "invite-1", Name: "Invite User", Policy: []byte(`{}`)},
-		{ID: "untracked-1", Name: "Untracked", Policy: []byte(`{}`)},
+		{ID: "external-1", Name: "External", Policy: []byte(`{"IsDisabled":false,"IsAdministrator":false}`)},
+		{ID: "invite-1", Name: "Invite User", Policy: []byte(`{"IsAdministrator":false}`)},
+		{ID: "untracked-1", Name: "Untracked", Policy: []byte(`{"IsAdministrator":false}`)},
 	}}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, adminRequest(t, http.MethodGet, "/admin/users", nil))
 
@@ -38,7 +38,7 @@ func TestUsersPageMergesLiveImportedAndInviteUsers(t *testing.T) {
 func TestUsersTrackRejectsAdministrators(t *testing.T) {
 	store := newFakeStore()
 	media := &fakeMediaServer{users: []mediaserver.User{{ID: "admin-1", Name: "Admin", Policy: []byte(`{"IsAdministrator":true}`)}}}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/users/admin-1/track", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -52,9 +52,9 @@ func TestUsersTrackRejectsAdministrators(t *testing.T) {
 
 func TestUsersDeleteRemovesUpstreamAndTrackedRecord(t *testing.T) {
 	store := newFakeStore()
-	store.managedUsers = []db.ManagedUser{{ExternalUserID: "user-1", Username: "Alice"}}
-	media := &fakeMediaServer{users: []mediaserver.User{{ID: "user-1", Name: "Alice", Policy: []byte(`{}`)}}}
-	handler := New(testConfig(), store, media)
+	store.managedUsers = []db.ManagedUser{{BindingID: 1, ExternalUserID: "user-1", Username: "Alice"}}
+	media := &fakeMediaServer{users: []mediaserver.User{{ID: "user-1", Name: "Alice", Policy: []byte(`{"IsAdministrator":false}`)}}}
+	handler := New(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/users/user-1/delete", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -68,9 +68,9 @@ func TestUsersDeleteRemovesUpstreamAndTrackedRecord(t *testing.T) {
 
 func TestUsersDeleteProtectsAdministrators(t *testing.T) {
 	store := newFakeStore()
-	store.managedUsers = []db.ManagedUser{{ExternalUserID: "admin-1", Username: "Admin"}}
+	store.managedUsers = []db.ManagedUser{{BindingID: 1, ExternalUserID: "admin-1", Username: "Admin"}}
 	media := &fakeMediaServer{users: []mediaserver.User{{ID: "admin-1", Name: "Admin", Policy: []byte(`{"IsAdministrator":true}`)}}}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/admin/users/admin-1/delete", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

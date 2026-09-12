@@ -17,7 +17,11 @@ type mediaHealthCache struct {
 }
 
 func (s *Server) mediaHealthy(ctx context.Context, baseURL, apiKey string) bool {
-	provider, _, _ := s.runtimeSettings()
+	snapshot, err := s.snapshot(ctx)
+	if err != nil {
+		return false
+	}
+	provider := snapshot.Settings.Provider
 	key := sha256.Sum256([]byte(provider + "\x00" + baseURL + "\x00" + apiKey))
 	now := time.Now()
 
@@ -29,7 +33,7 @@ func (s *Server) mediaHealthy(ctx context.Context, baseURL, apiKey string) bool 
 
 	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	healthy := s.media.Ping(pingCtx, baseURL, apiKey) == nil
+	healthy := snapshot.Media.Ping(pingCtx, baseURL, apiKey) == nil
 	if ctx.Err() == nil {
 		s.healthCache.key = key
 		s.healthCache.checkedAt = time.Now()

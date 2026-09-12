@@ -46,7 +46,7 @@ func TestClientIPRejectsSpoofedForwardedPrefix(t *testing.T) {
 
 func TestValidateBaseURL(t *testing.T) {
 	cfg := testConfig()
-	s := &Server{cfg: cfg, provider: cfg.MediaProvider}
+	s := &Server{cfg: cfg}
 	for _, value := range []string{"http://jellyfin:8096", "https://jellyfin.example"} {
 		if _, err := s.validateServerURL(value); err != nil {
 			t.Fatalf("validateBaseURL(%q) unexpected error: %v", value, err)
@@ -96,19 +96,6 @@ func TestSafeErrorRedactsSecretLikeValues(t *testing.T) {
 type assertErr string
 
 func (e assertErr) Error() string { return string(e) }
-
-func TestDisableAtFor(t *testing.T) {
-	if got := disableAtFor(0); got.Valid {
-		t.Fatalf("disableAtFor(0) = %#v, want invalid", got)
-	}
-	got := disableAtFor(2)
-	if !got.Valid {
-		t.Fatal("disableAtFor(2) should be valid")
-	}
-	if days := int(time.Until(got.Time).Hours() / 24); days < 1 || days > 2 {
-		t.Fatalf("disableAtFor(2) is about %d days away, want about 2", days)
-	}
-}
 
 func TestDashboardStatsFrom(t *testing.T) {
 	now := time.Now()

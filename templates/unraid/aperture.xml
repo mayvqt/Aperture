@@ -14,7 +14,7 @@
   <WebUI>http://[IP]:[PORT:8099]/setup</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/mayvqt/Aperture/main/templates/unraid/aperture.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/mayvqt/Aperture/main/internal/httpserver/assets/aperture-mark.svg</Icon>
-  <ExtraParams>--restart=unless-stopped --init --tmpfs /tmp --security-opt=no-new-privileges:true</ExtraParams>
+  <ExtraParams>--restart=unless-stopped --stop-timeout=270 --init --tmpfs /tmp --security-opt=no-new-privileges:true</ExtraParams>
   <PostArgs/>
   <CPUset/>
   <DonateText/>

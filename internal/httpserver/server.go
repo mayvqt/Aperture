@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mayvqt/aperture/internal/config"
+	"github.com/mayvqt/aperture/internal/connection"
 )
 
 const (
@@ -20,46 +21,88 @@ const (
 )
 
 type Server struct {
-	cfg              config.Config
-	store            Store
-	media            MediaServer
-	mux              *http.ServeMux
-	limiter          *rateLimiter
-	loginIPLimiter   *rateLimiter
-	healthCache      mediaHealthCache
-	trustedProxies   []*net.IPNet
-	hstsHost         string
-	runtimeMu        sync.RWMutex
-	setupMu          sync.Mutex
-	provider         string
-	runtimePublicURL string
-	cookieSecure     bool
-	webhookWG        sync.WaitGroup
+	cfg            config.Config
+	store          Store
+	connections    *connection.Manager
+	mux            *http.ServeMux
+	limiter        *rateLimiter
+	loginIPLimiter *rateLimiter
+	healthCache    mediaHealthCache
+	trustedProxies []*net.IPNet
+	setupMu        sync.Mutex
+	webhookWG      sync.WaitGroup
+	accountMu      sync.Mutex
+	activeAccounts map[int64]bool
+	activeUsers    map[string]bool
+	accountWG      sync.WaitGroup
+	httpWG         sync.WaitGroup
+	closing        bool
+	handler        http.Handler
 }
 
-func New(cfg config.Config, store Store, media MediaServer) http.Handler {
-	handler, _ := NewWithShutdown(cfg, store, media)
+func New(cfg config.Config, store Store, factory connection.Factory) http.Handler {
+	handler, _ := NewWithShutdown(cfg, store, factory)
 	return handler
 }
 
 // NewWithShutdown returns the HTTP handler and a function that waits for
 // accepted webhook deliveries to finish during graceful shutdown.
-func NewWithShutdown(cfg config.Config, store Store, media MediaServer) (http.Handler, func(context.Context) error) {
+func NewWithShutdown(cfg config.Config, store Store, factory connection.Factory) (http.Handler, func(context.Context) error) {
+	s := NewServer(cfg, store, factory)
+	return s, s.Drain
+}
+
+// NewServer owns HTTP, maintenance and accepted background deliveries together.
+func NewServer(cfg config.Config, store Store, factory connection.Factory) *Server {
 	s := &Server{
-		cfg:              cfg,
-		store:            store,
-		media:            media,
-		mux:              http.NewServeMux(),
-		limiter:          newRateLimiter(10, 10*time.Minute),
-		loginIPLimiter:   newRateLimiter(50, 10*time.Minute),
-		trustedProxies:   parseTrustedProxies(cfg.TrustedProxyCIDRs),
-		hstsHost:         securePublicHost(cfg.PublicURL),
-		provider:         cfg.MediaProvider,
-		runtimePublicURL: cfg.PublicURL,
-		cookieSecure:     cfg.CookieSecure,
+		cfg:            cfg,
+		store:          store,
+		connections:    connection.New(cfg, store, factory),
+		mux:            http.NewServeMux(),
+		limiter:        newRateLimiter(10, 10*time.Minute),
+		loginIPLimiter: newRateLimiter(50, 10*time.Minute),
+		trustedProxies: parseTrustedProxies(cfg.TrustedProxyCIDRs),
 	}
 	s.routes()
-	return s.securityHeaders(s.mux), s.waitForWebhooks
+	s.handler = s.securityHeaders(s.mux)
+	return s
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	s.accountMu.Lock()
+	if s.closing {
+		s.accountMu.Unlock()
+		http.Error(w, "Aperture is restarting. Try again shortly.", http.StatusServiceUnavailable)
+		return
+	}
+	s.httpWG.Add(1)
+	s.accountMu.Unlock()
+	defer s.httpWG.Done()
+	snapshot, err := s.connections.Current(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	s.handler.ServeHTTP(w, r.WithContext(connection.WithSnapshot(r.Context(), snapshot)))
+}
+
+func (s *Server) CloseAdmission() {
+	s.accountMu.Lock()
+	s.closing = true
+	s.accountMu.Unlock()
+}
+
+// Drain is called after the HTTP server and maintenance stop accepting work.
+func (s *Server) Drain(ctx context.Context) error {
+	s.CloseAdmission()
+	done := make(chan struct{})
+	go func() { s.httpWG.Wait(); s.accountWG.Wait(); close(done) }()
+	select {
+	case <-done:
+		return s.waitForWebhooks(ctx)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (s *Server) waitForWebhooks(ctx context.Context) error {
@@ -76,29 +119,26 @@ func (s *Server) waitForWebhooks(ctx context.Context) error {
 	}
 }
 
-func (s *Server) setRuntime(provider, publicURL string, cookieSecure bool) {
-	s.runtimeMu.Lock()
-	s.provider = provider
-	s.runtimePublicURL = publicURL
-	s.cookieSecure = cookieSecure
-	s.hstsHost = securePublicHost(publicURL)
-	s.runtimeMu.Unlock()
+func (s *Server) Initialize(ctx context.Context) error {
+	_, err := s.connections.Current(ctx)
+	return err
 }
 
 func (s *Server) runtimeSettings() (provider, publicURL string, cookieSecure bool) {
-	s.runtimeMu.RLock()
-	defer s.runtimeMu.RUnlock()
-	return s.provider, s.runtimePublicURL, s.cookieSecure
+	if s.connections != nil {
+		if current, ok := s.connections.Peek(); ok {
+			return current.Settings.Provider, current.Settings.PublicURL, current.CookieSecure
+		}
+	}
+	return s.cfg.MediaProvider, s.cfg.PublicURL, s.cfg.CookieSecure
 }
 
-func RunMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, media MediaServer) {
-	runMaintenanceWorker(ctx, cfg, store, media, maintenanceInterval)
-}
-
-func runMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, media MediaServer, interval time.Duration) {
-	s := &Server{cfg: cfg, store: store, media: media}
+func (s *Server) RunMaintenance(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
 	s.runMaintenance(ctx)
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(maintenanceInterval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -112,8 +152,10 @@ func runMaintenanceWorker(ctx context.Context, cfg config.Config, store Store, m
 
 func (s *Server) runMaintenance(ctx context.Context) {
 	s.reconcileAndLogStaleRegistrations(ctx)
-	s.processDueTemplateRetries(ctx)
-	s.processAndLogDueUserDisables(ctx)
+	if verified, err := s.verifiedAPIContext(ctx); err == nil {
+		s.processAndLogDueUserDisables(verified)
+		s.processDueTemplateRetries(verified)
+	}
 	s.pruneAuditLog(ctx)
 }
 

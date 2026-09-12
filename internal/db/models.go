@@ -43,6 +43,7 @@ type Template struct {
 
 type Invite struct {
 	ID              int64
+	BindingID       int64
 	TokenHash       string
 	TokenPrefix     string
 	Token           string
@@ -99,8 +100,23 @@ func CanRetryRegistrationTemplate(status string) bool {
 	return status == RegistrationNeedsAttention || status == RegistrationFailedApplyTemplate
 }
 
+func IsRegistrationActive(status string) bool {
+	switch status {
+	case RegistrationReserved, RegistrationCreatingUser, RegistrationApplyingTemplate, RegistrationRetryingTemplate, RegistrationLegacyPending:
+		return true
+	}
+	return false
+}
+
+func (r Registration) NeedsDisable(now time.Time) bool {
+	return r.ExternalUserID.Valid && !IsRegistrationActive(r.Status) &&
+		(r.CleanupPending || (r.UserDisableAt.Valid && !r.UserDisableAt.Time.After(now) && !r.UserDisabledAt.Valid)) &&
+		(!r.NextDisableAttemptAt.Valid || !r.NextDisableAttemptAt.Time.After(now))
+}
+
 type Registration struct {
 	ID                    int64
+	BindingID             int64
 	InviteID              int64
 	ExternalUserID        sql.NullString
 	Username              string
@@ -112,6 +128,8 @@ type Registration struct {
 	NextDisableAttemptAt  sql.NullTime
 	TemplateAttempts      int
 	NextTemplateAttemptAt sql.NullTime
+	CleanupPending        bool
+	CleanupError          sql.NullString
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -141,6 +159,8 @@ type Webhook struct {
 }
 
 type ManagedUser struct {
+	ID             int64
+	BindingID      int64
 	ExternalUserID string
 	Username       string
 	CreatedAt      time.Time

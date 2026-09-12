@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"github.com/mayvqt/aperture/internal/connection"
 	"sync"
 	"testing"
 )
@@ -11,7 +12,7 @@ func TestMediaHealthCacheCoalescesConcurrentChecks(t *testing.T) {
 		pingStarted: make(chan struct{}),
 		pingRelease: make(chan struct{}),
 	}
-	s := &Server{media: media}
+	s := NewServer(testConfig(), newFakeStore(), testMediaFactory(media))
 
 	const requests = 20
 	results := make(chan bool, requests)
@@ -40,14 +41,19 @@ func TestMediaHealthCacheCoalescesConcurrentChecks(t *testing.T) {
 
 func TestMediaHealthCacheSeparatesProviders(t *testing.T) {
 	media := &fakeMediaServer{}
-	s := &Server{media: media, provider: "jellyfin"}
+	s := NewServer(testConfig(), newFakeStore(), testMediaFactory(media))
 	if !s.mediaHealthy(t.Context(), "http://media:8096", "api-key") {
 		t.Fatal("initial health check failed")
 	}
 
 	media.pingErr = errFakePing
-	s.setRuntime("emby", "", false)
-	if s.mediaHealthy(t.Context(), "http://media:8096", "api-key") {
+	snap, err := s.snapshot(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap.Settings.Provider = "emby"
+	ctx := connection.WithSnapshot(t.Context(), snap)
+	if s.mediaHealthy(ctx, "http://media:8096", "api-key") {
 		t.Fatal("Emby health check reused Jellyfin cache entry")
 	}
 	if media.pingCalls.Load() != 2 {

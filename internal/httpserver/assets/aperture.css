@@ -424,3 +424,31 @@ select {
         padding: 22px 16px;
     }
 }
+
+.nav-toggle, .nav-toggle[hidden], nav[hidden] {
+    display: none;
+}
+
+@media (max-width: 1079px) {
+    header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+
+    .nav-toggle:not([hidden]) {
+        display: block;
+    }
+
+    header nav.admin-nav:not([hidden]) {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: visible;
+    }
+
+    header nav a, header nav button {
+        text-align: left;
+        min-height: 40px;
+    }
+}

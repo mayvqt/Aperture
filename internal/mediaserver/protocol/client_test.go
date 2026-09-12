@@ -179,3 +179,22 @@ func response(status int, body string) *http.Response {
 		Request: (&http.Request{}).WithContext(context.Background()),
 	}
 }
+
+func TestInspectRequiresAuthenticatedStableServerIdentity(t *testing.T) {
+	for _, body := range []string{`{"Id":"server-1","ServerName":"Media"}`, `{}`, `null`} {
+		client := NewWithHTTPClient(testAuthorization, identityURL, &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			if r.URL.Path != "/System/Info" || !strings.Contains(r.Header.Get("Authorization"), "synthetic-token") {
+				t.Fatal("identity request omitted authenticated endpoint")
+			}
+			return response(http.StatusOK, body), nil
+		})})
+		info, err := client.Inspect(t.Context(), "http://media.test", "synthetic-token", "device")
+		if strings.Contains(body, "server-1") {
+			if err != nil || info.ID != "server-1" {
+				t.Fatalf("identity=%+v %v", info, err)
+			}
+		} else if err == nil {
+			t.Fatal("missing identity accepted")
+		}
+	}
+}

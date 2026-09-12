@@ -9,6 +9,10 @@ Open `http://localhost:8099` from a trusted network. Choose Jellyfin or Emby, en
 and API key, then sign in as a media-server administrator. Create or import a non-admin template before creating an
 invite.
 
+The default template uses the media server's account defaults with administrator
+access disabled. Imported policies keep the new account's authentication and
+password-reset providers. JSON property names must be unique regardless of casing.
+
 Standalone installs use `aperture serve`. Persist and back up the config directory. Do not expose Aperture publicly
 until the unauthenticated first-run setup is complete.
 

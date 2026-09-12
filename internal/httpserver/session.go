@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mayvqt/aperture/internal/connection"
 	"github.com/mayvqt/aperture/internal/db"
 	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/security"
@@ -41,13 +42,37 @@ func (s *Server) admin(next func(http.ResponseWriter, *http.Request, db.Session)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		settings, err := s.settings(r.Context())
+		snapshot, err := s.snapshot(r.Context())
 		if err != nil {
 			s.error(w, err)
 			return
 		}
+		matches := func(candidate connection.Snapshot) bool {
+			return session.BindingID > 0 && session.BindingID == candidate.Identity.Binding.ID && session.Generation == candidate.Identity.Generation
+		}
+		if !matches(snapshot) {
+			s.clearSession(w, r, session.ID)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		verified, err := s.connections.Verify(r.Context(), snapshot, session.AccessToken, session.DeviceID)
+		if err != nil {
+			if invalidMediaSession(err) || errors.Is(err, db.ErrConnectionChanged) {
+				s.clearSession(w, r, session.ID)
+				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				return
+			}
+			s.message(w, "Could not verify server", "Aperture could not confirm the media server's identity. Try again shortly.", http.StatusBadGateway)
+			return
+		}
+		if !matches(verified) {
+			s.clearSession(w, r, session.ID)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		r = r.WithContext(connection.WithSnapshot(r.Context(), verified))
 		checkCtx, cancel := context.WithTimeout(r.Context(), adminCheckTimeout)
-		isAdmin, err := s.media.IsAdmin(checkCtx, settings.ServerURL, session.AccessToken, session.DeviceID, session.UserID)
+		isAdmin, err := verified.Media.IsAdmin(checkCtx, verified.Settings.ServerURL, session.AccessToken, session.DeviceID, session.UserID)
 		cancel()
 		if err != nil {
 			if invalidMediaSession(err) {
@@ -113,7 +138,7 @@ func (s *Server) data(r *http.Request, session db.Session) viewData {
 	case strings.HasPrefix(path, "/admin/settings"):
 		page, title = "/admin/settings", "Settings"
 	}
-	return viewData{Admin: true, Username: session.Username, CSRF: session.CSRFSecret, Title: title, CurrentPage: page}
+	return viewData{BindingID: session.BindingID, Admin: true, Username: session.Username, CSRF: session.CSRFSecret, Title: title, CurrentPage: page}
 }
 func (s *Server) validCSRF(r *http.Request, expected string) bool {
 	actual, ok := formCSRF(r)

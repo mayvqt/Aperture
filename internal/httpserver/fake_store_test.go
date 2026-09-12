@@ -10,6 +10,7 @@ import (
 
 type fakeStore struct {
 	settings              db.Settings
+	connection            db.MediaConnection
 	session               db.Session
 	template              db.Template
 	invite                db.Invite
@@ -64,19 +65,20 @@ func newFakeStore() *fakeStore {
 		InviteSecret:  "invite-secret-with-at-least-32-characters",
 	}
 	tmpl := db.Template{ID: 1, Name: "Default", PolicyJSON: `{"IsAdministrator":false}`, IsDefault: true}
-	invite := db.Invite{ID: 1, TokenHash: "hash", TokenPrefix: "prefix", Token: "saved-token", Label: "Family", TemplateID: 1, Template: "Default", MaxUses: 3, Enabled: true, UserExpiryDays: 0}
+	invite := db.Invite{ID: 1, TokenHash: "hash", TokenPrefix: "prefix", Token: "saved-token", Label: "Family", TemplateID: 1, Template: "Default", MaxUses: 3, Enabled: true, UserExpiryDays: 0, BindingID: 1}
 	return &fakeStore{
 		settings:      settings,
-		session:       db.Session{ID: "session-id", UserID: "admin-id", Username: "admin", AccessToken: "access-token", DeviceID: "device-id", CSRFSecret: "csrf-secret", ExpiresAt: time.Now().Add(time.Hour)},
+		connection:    db.MediaConnection{Provider: settings.Provider, BaseURL: settings.ServerURL, Generation: 1, Binding: db.MediaBinding{ID: 1, Provider: settings.Provider, BaseURL: settings.ServerURL, ServerID: "synthetic-server", Name: "Media"}},
+		session:       db.Session{ID: "session-id", UserID: "admin-id", Username: "admin", AccessToken: "access-token", DeviceID: "device-id", CSRFSecret: "csrf-secret", ExpiresAt: time.Now().Add(time.Hour), BindingID: 1, Generation: 1},
 		template:      tmpl,
 		invite:        invite,
 		invites:       []db.Invite{invite},
-		registrations: []db.Registration{{ID: 1, Username: "alice", Status: db.RegistrationComplete, ExternalUserID: sql.NullString{String: "media-alice", Valid: true}}},
+		registrations: []db.Registration{{BindingID: 1, ID: 1, Username: "alice", Status: db.RegistrationComplete, ExternalUserID: sql.NullString{String: "media-alice", Valid: true}}},
 		inviteActivity: map[int64]db.InviteActivity{
 			1: {InviteID: 1, Username: "alice", Status: db.RegistrationComplete, CreatedAt: time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)},
 		},
 		recovery: db.RegistrationRecovery{
-			Registration:   db.Registration{ID: 1, InviteID: 1, ExternalUserID: sql.NullString{String: "media-alice", Valid: true}, Status: db.RegistrationNeedsAttention, CreatedAt: time.Now().Add(-time.Hour)},
+			Registration:   db.Registration{ID: 1, InviteID: 1, ExternalUserID: sql.NullString{String: "media-alice", Valid: true}, Status: db.RegistrationNeedsAttention, CreatedAt: time.Now().Add(-time.Hour), BindingID: 1},
 			Template:       tmpl,
 			UserExpiryDays: 7,
 		},
@@ -118,29 +120,9 @@ func (f *fakeStore) UpdateApplicationSettings(ctx context.Context, provider, pub
 	}
 	return nil
 }
-func (f *fakeStore) UpdateSetupSettings(ctx context.Context, provider, publicURL, serverURL, apiKey string) error {
-	if f.setupSettingsErr != nil {
-		return f.setupSettingsErr
-	}
-	for _, setting := range []struct {
-		key, value string
-		secret     bool
-	}{
-		{"media_provider", provider, false},
-		{"public_url", publicURL, false},
-		{"server_url", serverURL, false},
-		{"api_key", apiKey, true},
-	} {
-		if err := f.SetSetting(ctx, setting.key, setting.value, setting.secret); err != nil {
-			return err
-		}
-	}
-	f.settings.PublicURL = publicURL
-	return nil
-}
-func (f *fakeStore) CreateSession(_ context.Context, _, _, _, deviceID string, ttl time.Duration) (string, string, error) {
-	f.createdDeviceID = deviceID
-	f.createdSessionTTL = ttl
+func (f *fakeStore) CreateSession(_ context.Context, input db.SessionInput) (string, string, error) {
+	f.createdDeviceID = input.DeviceID
+	f.createdSessionTTL = input.TTL
 	return f.session.ID, f.session.CSRFSecret, nil
 }
 func (f *fakeStore) Session(_ context.Context, id string) (db.Session, error) {
@@ -183,7 +165,6 @@ func (f *fakeStore) CreateInvite(_ context.Context, invite db.Invite) (int64, er
 	f.createdInvite.ID = 99
 	return 99, nil
 }
-func (f *fakeStore) ListInvites(context.Context) ([]db.Invite, error) { return f.invites, nil }
 func (f *fakeStore) InvitePreview(_ context.Context, limit int) ([]db.Invite, error) {
 	if limit > len(f.invites) {
 		limit = len(f.invites)
@@ -208,17 +189,20 @@ func (f *fakeStore) InvitePreset(_ context.Context, id int64) (db.Invite, error)
 	}
 	return db.Invite{}, db.ErrNotFound
 }
-func (f *fakeStore) InviteByHash(context.Context, string) (db.Invite, error) {
+func (f *fakeStore) InviteByHash(context.Context, string, int64) (db.Invite, error) {
 	if f.inviteErr != nil {
 		return db.Invite{}, f.inviteErr
 	}
 	return f.invite, nil
 }
-func (f *fakeStore) ReserveInviteUse(context.Context, int64, string, string, string) (int64, db.Template, error) {
+func (f *fakeStore) ReserveInviteUse(context.Context, int64, int64, string, string, string) (int64, db.Template, error) {
 	if f.templateErr != nil {
 		return 0, db.Template{}, f.templateErr
 	}
 	f.reservedInviteUse = true
+	if f.invite.UserExpiryDays > 0 {
+		f.completedDisableAt = sql.NullTime{Time: time.Now().AddDate(0, 0, f.invite.UserExpiryDays), Valid: true}
+	}
 	return 123, f.template, nil
 }
 func (f *fakeStore) BeginUserCreation(context.Context, int64) error {
@@ -241,16 +225,15 @@ func (f *fakeStore) RecordCreatedUser(_ context.Context, _ int64, userID string)
 	f.recordedUserID = userID
 	return nil
 }
-func (f *fakeStore) CompleteRegistration(_ context.Context, _ int64, status string, _ string, disableAt sql.NullTime) error {
+func (f *fakeStore) CompleteRegistration(_ context.Context, _ int64, status string, _ string) error {
 	f.completedStatus = status
-	f.completedDisableAt = disableAt
 	return nil
 }
 func (f *fakeStore) ReconcileStaleRegistrations(context.Context, time.Time, int) (db.ReconciliationResult, error) {
 	f.reconciledStale = true
 	return f.reconciliation, nil
 }
-func (f *fakeStore) DueUserDisables(context.Context, int) ([]db.Registration, error) {
+func (f *fakeStore) DueUserDisables(context.Context, int64, int) ([]db.Registration, error) {
 	return f.dueDisables, nil
 }
 func (f *fakeStore) MarkUserDisabled(_ context.Context, registrationID int64) error {
@@ -261,19 +244,19 @@ func (f *fakeStore) MarkUserDisableFailed(_ context.Context, id int64, _ string)
 	f.failedDisableID = id
 	return nil
 }
-func (f *fakeStore) SetInviteEnabled(context.Context, int64, bool) error { return nil }
-func (f *fakeStore) DeleteInvite(context.Context, int64) error           { return nil }
+func (f *fakeStore) SetInviteEnabled(context.Context, int64, int64, bool) error { return nil }
+func (f *fakeStore) DeleteInvite(context.Context, int64) error                  { return nil }
 func (f *fakeStore) Audit(context.Context, string, string, string, string, string, string, string) error {
 	return nil
 }
 func (f *fakeStore) RecentRegistrations(context.Context, int) ([]db.Registration, error) {
 	return f.registrations, nil
 }
-func (f *fakeStore) RegistrationUsers(context.Context) ([]db.Registration, error) {
+func (f *fakeStore) RegistrationUsers(context.Context, int64) ([]db.Registration, error) {
 	return f.registrations, nil
 }
 func (f *fakeStore) Registration(_ context.Context, id int64) (db.Registration, error) {
-	for _, registration := range f.registrations {
+	for _, registration := range append(append([]db.Registration{}, f.registrations...), f.dueDisables...) {
 		if registration.ID == id {
 			return registration, nil
 		}
@@ -284,7 +267,7 @@ func (f *fakeStore) DeleteRegistration(_ context.Context, id int64) error {
 	f.deletedRegistrationID = id
 	return nil
 }
-func (f *fakeStore) ListManagedUsers(context.Context) ([]db.ManagedUser, error) {
+func (f *fakeStore) ListManagedUsers(context.Context, int64) ([]db.ManagedUser, error) {
 	return f.managedUsers, nil
 }
 func (f *fakeStore) SaveManagedUser(_ context.Context, user db.ManagedUser) error {
@@ -297,7 +280,7 @@ func (f *fakeStore) SaveManagedUser(_ context.Context, user db.ManagedUser) erro
 	f.managedUsers = append(f.managedUsers, user)
 	return nil
 }
-func (f *fakeStore) DeleteUserRecords(_ context.Context, id string) error {
+func (f *fakeStore) DeleteUserRecords(_ context.Context, _ int64, id string) error {
 	for i := len(f.registrations) - 1; i >= 0; i-- {
 		if f.registrations[i].ExternalUserID.String == id {
 			f.registrations = append(f.registrations[:i], f.registrations[i+1:]...)
@@ -310,7 +293,7 @@ func (f *fakeStore) DeleteUserRecords(_ context.Context, id string) error {
 	}
 	return nil
 }
-func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64) (db.RegistrationRecovery, error) {
+func (f *fakeStore) ClaimTemplateRecovery(context.Context, int64, int64, bool) (db.RegistrationRecovery, error) {
 	recovery := f.recovery
 	recovery.Registration.Status = db.RegistrationRetryingTemplate
 	return recovery, nil
@@ -319,11 +302,11 @@ func (f *fakeStore) RecordTemplateRetryFailure(_ context.Context, _ int64, messa
 	f.recoveryFailure = message
 	return nil
 }
-func (f *fakeStore) CompleteTemplateRecovery(context.Context, int64, sql.NullTime) error {
+func (f *fakeStore) CompleteTemplateRecovery(context.Context, int64) error {
 	f.recoveryCompleted = true
 	return nil
 }
-func (f *fakeStore) DashboardCounts(context.Context) (db.DashboardCounts, error) {
+func (f *fakeStore) DashboardCounts(context.Context, int64) (db.DashboardCounts, error) {
 	stats := dashboardStatsFrom(f.invites, f.registrations)
 	return db.DashboardCounts{
 		ActiveInvites:         stats.ActiveInvites,
@@ -331,9 +314,6 @@ func (f *fakeStore) DashboardCounts(context.Context) (db.DashboardCounts, error)
 		NeedsAttention:        stats.NeedsAttention,
 		ScheduledUserDisables: stats.ScheduledUserDisables,
 	}, nil
-}
-func (f *fakeStore) LatestInviteActivity(context.Context) (map[int64]db.InviteActivity, error) {
-	return f.inviteActivity, nil
 }
 func (f *fakeStore) ListAuditEvents(context.Context, int) ([]db.AuditEvent, error) {
 	return f.auditEvents, nil
@@ -357,8 +337,102 @@ func (f *fakeStore) DeleteWebhook(_ context.Context, id int64) error {
 	}
 	return db.ErrNotFound
 }
-func (f *fakeStore) DueTemplateRecoveries(context.Context, int) ([]db.RegistrationRecovery, error) {
-	return f.dueTemplateRetries, nil
+func (f *fakeStore) ListDueTemplateRecoveryIDs(context.Context, int64, int) ([]int64, error) {
+	var ids []int64
+	for _, r := range f.dueTemplateRetries {
+		ids = append(ids, r.Registration.ID)
+	}
+	return ids, nil
 }
 
 var _ Store = (*fakeStore)(nil)
+
+func (f *fakeStore) RecordProvisioningUser(_ context.Context, _ int64, id string) error {
+	f.recordedUserID = id
+	return nil
+}
+func (f *fakeStore) RequireAccountCleanup(_ context.Context, _ int64, id string) error {
+	f.recordedUserID = id
+	return nil
+}
+func (f *fakeStore) UserDeletionRegistrations(_ context.Context, _ int64, id string) ([]db.Registration, error) {
+	var regs []db.Registration
+	for _, r := range f.registrations {
+		if r.ExternalUserID.String == id {
+			if db.IsRegistrationActive(r.Status) {
+				return nil, db.ErrRegistrationTransition
+			}
+			regs = append(regs, r)
+		}
+	}
+	if len(regs) > 0 {
+		return regs, nil
+	}
+	for _, u := range f.managedUsers {
+		if u.ExternalUserID == id {
+			return nil, nil
+		}
+	}
+	return nil, db.ErrNotFound
+}
+
+func (f *fakeStore) MediaConnection(context.Context) (db.MediaConnection, error) {
+	return f.connection, nil
+}
+func (f *fakeStore) PublishMediaConnection(ctx context.Context, u db.ConnectionUpdate) (db.MediaConnection, error) {
+	if f.setupSettingsErr != nil {
+		return db.MediaConnection{}, f.setupSettingsErr
+	}
+	if u.ExpectedGeneration != f.connection.Generation {
+		return db.MediaConnection{}, db.ErrConnectionChanged
+	}
+	b := u.Origin
+	b.ID = f.connection.Binding.ID
+	if b.Provider != f.connection.Provider || b.BaseURL != f.connection.BaseURL || b.ServerID != f.connection.Binding.ServerID {
+		f.connection.Generation++
+		b.ID++
+	}
+	if b.ServerID == "" {
+		b.ID = 0
+	}
+	if b.ServerID != "" && b.ID == 0 {
+		b.ID = 1
+	}
+	if err := f.UpdateApplicationSettings(ctx, u.Provider, u.PublicURL, u.ServerURL, u.APIKey); err != nil {
+		return db.MediaConnection{}, err
+	}
+	f.connection.Binding = b
+	f.connection.Provider = b.Provider
+	f.connection.BaseURL = b.BaseURL
+	return f.connection, nil
+}
+func (f *fakeStore) MediaBindings(context.Context) ([]db.MediaBinding, error) {
+	return []db.MediaBinding{f.connection.Binding}, nil
+}
+func (f *fakeStore) AdoptInvite(context.Context, int64, int64) error       { return nil }
+func (f *fakeStore) AdoptRegistration(context.Context, int64, int64) error { return nil }
+
+func (f *fakeStore) Invite(_ context.Context, id int64) (db.Invite, error) {
+	for _, v := range f.invites {
+		if v.ID == id {
+			return v, nil
+		}
+	}
+	return db.Invite{}, db.ErrNotFound
+}
+func (f *fakeStore) InvitePage(context.Context, int64, int) ([]db.Invite, error) {
+	return f.invites, nil
+}
+func (f *fakeStore) InvitePageActivity(context.Context, []int64) (map[int64]db.InviteActivity, error) {
+	return f.inviteActivity, nil
+}
+func (f *fakeStore) RegistrationPage(context.Context, int64, int64, bool, int) ([]db.Registration, error) {
+	return f.registrations, nil
+}
+func (f *fakeStore) ManagedUserReviewPage(context.Context, int64, int64, int) ([]db.ManagedUser, error) {
+	return nil, nil
+}
+func (f *fakeStore) ManagedUser(context.Context, int64) (db.ManagedUser, error) {
+	return db.ManagedUser{}, db.ErrNotFound
+}
+func (f *fakeStore) AdoptManagedUser(context.Context, int64, int64) error { return nil }

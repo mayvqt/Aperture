@@ -10,7 +10,7 @@ import (
 
 func TestInvitesListShowsSavedCopyButtons(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/invites", nil)
 	rr := httptest.NewRecorder()
 
@@ -32,7 +32,7 @@ func TestInvitesListShowsSavedCopyButtons(t *testing.T) {
 
 func TestInvitesNewCustomExpiryIsProgressivelyEnhanced(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/invites/new", nil)
 	rr := httptest.NewRecorder()
 
@@ -57,7 +57,7 @@ func TestInvitesNewCustomExpiryIsProgressivelyEnhanced(t *testing.T) {
 
 func TestInvitesNewCanReuseExistingInviteAsPreset(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/invites/new?preset_id=1", nil)
 	rr := httptest.NewRecorder()
 
@@ -76,7 +76,7 @@ func TestInvitesNewCanReuseExistingInviteAsPreset(t *testing.T) {
 
 func TestInvitesNewIgnoresMissingPreset(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodGet, "/admin/invites/new?preset_id=404", nil)
 	rr := httptest.NewRecorder()
 
@@ -99,7 +99,7 @@ func TestInvitesNewIgnoresMissingPreset(t *testing.T) {
 
 func TestInvitesCreateStoresUserExpiryDaysWithoutPuttingTokenInRedirect(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":             {store.session.CSRFSecret},
 		"label":            {"Family"},
@@ -138,7 +138,7 @@ func TestInvitesCreateRequiresAPIKey(t *testing.T) {
 	cfg := testConfig()
 	cfg.APIKey = ""
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":             {store.session.CSRFSecret},
 		"label":            {"Keep this label"},
@@ -168,7 +168,7 @@ func TestInvitesCreateRequiresAPIKey(t *testing.T) {
 
 func TestInvitesCreateValidationRendersFormAndPreservesSafeFields(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":               {store.session.CSRFSecret},
 		"label":              {"Keep this label"},
@@ -204,7 +204,7 @@ func TestInvitesCreateValidationPreservesQuickExpiryChoice(t *testing.T) {
 	for _, choice := range []string{"1", "7", "30"} {
 		t.Run(choice, func(t *testing.T) {
 			store := newFakeStore()
-			handler := New(testConfig(), store, &fakeMediaServer{})
+			handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 			form := url.Values{
 				"csrf":               {store.session.CSRFSecret},
 				"label":              {"Family"},
@@ -236,7 +236,7 @@ func TestInvitesCreateValidationPreservesQuickExpiryChoice(t *testing.T) {
 
 func TestInvitesCreateSupportsQuickExpiryChoices(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{
 		"csrf":               {store.session.CSRFSecret},
 		"label":              {"Family"},

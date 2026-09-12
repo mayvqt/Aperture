@@ -18,7 +18,7 @@ import (
 
 func TestAdminLoginBrowserFlow(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	getRequest := httptest.NewRequest(http.MethodGet, "/login", nil)
 	getResponse := httptest.NewRecorder()
@@ -77,7 +77,7 @@ func TestLoginRememberMeSessionDuration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := newFakeStore()
-			handler := New(testConfig(), store, &fakeMediaServer{})
+			handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 			form := url.Values{
 				"csrf":        {"csrf-value"},
 				"username":    {"admin"},
@@ -110,7 +110,7 @@ func TestLoginRememberMeSessionDuration(t *testing.T) {
 
 func TestLoginFormIncludesRememberMeControl(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/login", nil))
 
@@ -125,7 +125,7 @@ func TestLoginFormIncludesRememberMeControl(t *testing.T) {
 
 func TestSuccessfulLoginsDoNotExhaustClientIPLimit(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	csrf := "csrf-value"
 
 	for i := range 60 {
@@ -155,7 +155,7 @@ func TestSetupPostRejectsInvalidMediaServerURL(t *testing.T) {
 		CookieSecure:  false,
 		SessionSecret: store.settings.SessionSecret,
 		InviteSecret:  store.settings.InviteSecret,
-	}, store, &fakeMediaServer{})
+	}, store, testMediaFactory(&fakeMediaServer{}))
 	csrf := "csrf-value"
 	form := url.Values{
 		"csrf":       {csrf},
@@ -183,7 +183,7 @@ func TestSetupPostRejectsInvalidMediaServerURL(t *testing.T) {
 
 func TestSetupRedirectsWhenMediaServerURLIsEnvironmentManaged(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	for _, method := range []string{http.MethodGet, http.MethodPost} {
 		req := httptest.NewRequest(method, "/setup", nil)
@@ -208,7 +208,7 @@ func TestSetupUsesEnvironmentManagedAPIKeyWithoutStoringIt(t *testing.T) {
 	cfg.ServerURLManaged = false
 	cfg.APIKeyManaged = true
 	media := &fakeMediaServer{}
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	getReq := httptest.NewRequest(http.MethodGet, "/setup", nil)
 	getRR := httptest.NewRecorder()
@@ -241,10 +241,10 @@ func TestSetupUsesEnvironmentManagedAPIKeyWithoutStoringIt(t *testing.T) {
 	if postRR.Code != http.StatusSeeOther {
 		t.Fatalf("POST status = %d, want redirect; body %s", postRR.Code, postRR.Body.String())
 	}
-	if len(store.settingWrites) != 4 || store.settingWrites[0].key != "media_provider" || store.settingWrites[1].key != "public_url" {
-		t.Fatalf("setup writes = %#v, want complete browser settings", store.settingWrites)
+	if len(store.settingWrites) != 1 || store.settingWrites[0].key != "server_url" {
+		t.Fatalf("setup writes = %#v, want only browser-managed server URL", store.settingWrites)
 	}
-	if got, _ := media.pingAPIKey.Load().(string); got != cfg.APIKey {
+	if got, _ := media.inspectAPIKey.Load().(string); got != cfg.APIKey {
 		t.Fatalf("setup ping API key = %q, want environment-managed key", got)
 	}
 }
@@ -259,7 +259,7 @@ func TestSetupConfiguresEmbyEntirelyFromBrowser(t *testing.T) {
 		CookieSecure: false,
 	}
 	media := &fakeMediaServer{}
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	getReq := httptest.NewRequest(http.MethodGet, "/setup", nil)
 	getRR := httptest.NewRecorder()
@@ -297,7 +297,7 @@ func TestSetupConfiguresEmbyEntirelyFromBrowser(t *testing.T) {
 	if postRR.Code != http.StatusSeeOther || postRR.Header().Get("Location") != "/login" {
 		t.Fatalf("status = %d, location = %q; body %s", postRR.Code, postRR.Header().Get("Location"), postRR.Body.String())
 	}
-	if media.provider != mediaserver.ProviderEmby {
+	if handler.(*Server).connectionsStateProvider() != "emby" {
 		t.Fatalf("active provider = %q", media.provider)
 	}
 	if store.settings.Provider != "emby" || store.settings.PublicURL != "https://join.example.com" ||
@@ -315,7 +315,7 @@ func TestSetupRestoresProviderWhenSettingsCannotBeSaved(t *testing.T) {
 	store.setupSettingsErr = errors.New("save failed")
 	cfg := config.Config{MediaProvider: "jellyfin"}
 	media := &fakeMediaServer{provider: mediaserver.ProviderJellyfin}
-	handler := New(cfg, store, media)
+	handler := New(cfg, store, testMediaFactory(media))
 
 	csrf := "csrf-value"
 	form := url.Values{
@@ -345,7 +345,7 @@ func TestSetupRestoresProviderWhenSettingsCannotBeSaved(t *testing.T) {
 
 func TestLoginInvalidCSRFDoesNotConsumeRateLimit(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 
 	for range 10 {
 		form := url.Values{"username": {"admin"}, "password": {"password"}}
@@ -377,7 +377,7 @@ func TestLoginInvalidCSRFDoesNotConsumeRateLimit(t *testing.T) {
 
 func TestLoginRateLimitsRotatingUsernamesByClientIP(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{authErr: errors.New("bad credentials")})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{authErr: errors.New("bad credentials")}))
 	csrf := "csrf-value"
 
 	for i := range 51 {
@@ -410,10 +410,10 @@ type setupPingMedia struct {
 	pingError error
 }
 
-func (m *setupPingMedia) Ping(context.Context, string, string) error {
+func (m *setupPingMedia) Inspect(context.Context, string, string, string) (mediaserver.ServerInfo, error) {
 	close(m.started)
 	<-m.release
-	return m.pingError
+	return mediaserver.ServerInfo{ID: "synthetic-server"}, m.pingError
 }
 
 func TestConcurrentSetupCannotOverwriteCompletedConfiguration(t *testing.T) {
@@ -427,7 +427,7 @@ func TestConcurrentSetupCannotOverwriteCompletedConfiguration(t *testing.T) {
 			if failFirst {
 				media.pingError = errors.New("upstream unavailable")
 			}
-			handler := New(config.Config{MediaProvider: "jellyfin"}, store, media)
+			handler := New(config.Config{MediaProvider: "jellyfin"}, store, testMediaFactory(media))
 			secret := store.settings.SessionSecret
 			post := func(provider, serverURL, apiKey string) *httptest.ResponseRecorder {
 				form := url.Values{"csrf": {"csrf-value"}, "provider": {provider}, "public_url": {"https://join.example.test"}, "server_url": {serverURL}, "api_key": {apiKey}}
@@ -473,7 +473,7 @@ func TestConcurrentSetupCannotOverwriteCompletedConfiguration(t *testing.T) {
 			if failFirst {
 				wantProvider, wantURL = "jellyfin", "http://second-media:8096"
 			}
-			if store.settings.Provider != wantProvider || store.settings.ServerURL != wantURL || string(media.provider) != wantProvider || len(store.settingWrites) != 4 {
+			if store.settings.Provider != wantProvider || store.settings.ServerURL != wantURL || handler.(*Server).connectionsStateProvider() != wantProvider || len(store.settingWrites) != 4 {
 				t.Fatalf("setup did not preserve the single successful configuration: stored provider=%q runtime provider=%q writes=%d", store.settings.Provider, media.provider, len(store.settingWrites))
 			}
 		})

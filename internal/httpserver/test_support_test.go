@@ -1,6 +1,9 @@
 package httpserver
 
 import (
+	"context"
+	"github.com/mayvqt/aperture/internal/connection"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -104,4 +107,21 @@ func testConfig() config.Config {
 		ServerURLManaged: true,
 		APIKeyManaged:    true,
 	}
+}
+
+func testMediaFactory(media mediaserver.Server) connection.Factory {
+	return func(mediaserver.Provider) (mediaserver.Server, error) { return media, nil }
+}
+func verifiedTestContext(t *testing.T, s *Server) context.Context {
+	t.Helper()
+	ctx, err := s.verifiedAPIContext(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ctx
+}
+
+func (s *Server) connectionsStateProvider() string {
+	v, _ := s.connections.Peek()
+	return v.Settings.Provider
 }

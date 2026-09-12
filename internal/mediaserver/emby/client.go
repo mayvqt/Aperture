@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/mediaserver/protocol"
@@ -31,7 +30,7 @@ var authorization = protocol.Authorization{
 	TokenHeader: "X-Emby-Token",
 }
 
-func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, password string) (mediaserver.User, error) {
+func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, password string, created func(mediaserver.User) error) (mediaserver.User, error) {
 	var user mediaserver.User
 	if err := c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/New", apiKey, map[string]string{
 		"Name": username,
@@ -41,18 +40,16 @@ func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, pass
 	if strings.TrimSpace(user.ID) == "" {
 		return mediaserver.User{}, errors.New("emby create-user response was incomplete")
 	}
+	if err := created(user); err != nil {
+		return user, err
+	}
 	err := c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/"+url.PathEscape(user.ID)+"/Password", apiKey, map[string]any{
 		"NewPw": password, "ResetPassword": false,
 	}, nil)
 	if err == nil {
 		return user, nil
 	}
-	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-	defer cancel()
-	if disableErr := c.DisableUser(cleanupCtx, baseURL, apiKey, user.ID); disableErr != nil {
-		return user, fmt.Errorf("set Emby password: %w; disable incomplete account: %v", err, disableErr)
-	}
-	return user, fmt.Errorf("set Emby password (incomplete account disabled): %w", err)
+	return user, fmt.Errorf("set Emby password: %w", err)
 }
 
 func normalizeURL(value string) (string, error) {

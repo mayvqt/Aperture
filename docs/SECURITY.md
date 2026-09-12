@@ -21,12 +21,19 @@ Initial setup is serialized within the application process so a delayed request
 cannot overwrite completed setup. Run one Aperture process per state directory.
 After an invite use is reserved, account provisioning continues for a bounded
 period even if the browser disconnects. Incomplete accounts are disabled when
-the media server is reachable; failed cleanup requires administrator intervention.
+the media server is reachable. Cleanup is persisted before access changes and
+retried after failures or restarts, independently of the template retry limit.
+The account ID is saved before Emby password setup begins.
 Accounts with incomplete password setup retain their external ID for review and
 cannot be enabled through automatic or manual template-only retries.
 
+Template policies always disable administrator access, regardless of property
+casing. Conflicting property names are rejected. Applying a template preserves
+the target account's authentication and password-reset providers and merges its
+remaining defaults, so imported authentication settings do not cross accounts.
+
 Before upgrading an existing installation, review older `needs_attention`
 registrations in the media server, especially password-setup failures. Earlier
-records are not reclassified by this release. Keep any incomplete accounts
+records may not identify the interrupted password step. Keep any incomplete accounts
 disabled and finish password setup before allowing a template retry. Do this
 before restarting Aperture, since maintenance can retry eligible records.

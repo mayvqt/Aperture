@@ -107,7 +107,7 @@ func TestTemplateDefaultAndDeleteRules(t *testing.T) {
 		TokenHash:  "hash-second",
 		Label:      "invite",
 		TemplateID: secondID,
-		MaxUses:    1,
+		MaxUses:    1, BindingID: 1,
 	}); err != nil {
 		t.Fatal(err)
 	}

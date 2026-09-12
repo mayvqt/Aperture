@@ -21,7 +21,7 @@ func TestValidCSRFDeniesEmptyValues(t *testing.T) {
 
 func TestAdminRevocationInvalidatesApertureSession(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{adminRevoked: true})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{adminRevoked: true}))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -40,7 +40,7 @@ func TestAdminRevocationInvalidatesApertureSession(t *testing.T) {
 }
 
 func TestAdminVerificationFailsClosed(t *testing.T) {
-	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{isAdminErr: errors.New("jellyfin unavailable")})
+	handler := New(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{isAdminErr: errors.New("jellyfin unavailable")}))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -53,9 +53,9 @@ func TestAdminVerificationFailsClosed(t *testing.T) {
 
 func TestAdminInvalidMediaServerTokenClearsSession(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{
 		isAdminErr: &mediaserver.HTTPError{StatusCode: http.StatusUnauthorized, Status: "401 Unauthorized"},
-	})
+	}))
 	req := adminRequest(t, http.MethodGet, "/admin", nil)
 	rr := httptest.NewRecorder()
 
@@ -75,7 +75,7 @@ func TestAdminInvalidMediaServerTokenClearsSession(t *testing.T) {
 
 func TestLogoutRequiresValidCSRFBeforeClearingCookie(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := adminRequest(t, http.MethodPost, "/logout", nil)
 	rr := httptest.NewRecorder()
 
@@ -94,7 +94,7 @@ func TestLogoutRequiresValidCSRFBeforeClearingCookie(t *testing.T) {
 
 func TestLogoutWithValidCSRFDeletesSessionAndClearsCookie(t *testing.T) {
 	store := newFakeStore()
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	form := url.Values{"csrf": {store.session.CSRFSecret}}
 	req := adminRequest(t, http.MethodPost, "/logout", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

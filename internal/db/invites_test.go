@@ -13,19 +13,19 @@ func TestReserveInviteUseHonorsMaxUses(t *testing.T) {
 		TokenPrefix: "prefix",
 		Label:       "test",
 		TemplateID:  1,
-		MaxUses:     1,
+		MaxUses:     1, BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	regID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	regID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if regID == 0 {
 		t.Fatal("expected registration id")
 	}
-	_, _, err = store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "bob")
+	_, _, err = store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "bob")
 	if !errors.Is(err, ErrInviteUnavailable) {
 		t.Fatalf("expected ErrInviteUnavailable, got %v", err)
 	}
@@ -40,7 +40,7 @@ func TestCreateInviteEncryptsRetainedTokenForCopyLinks(t *testing.T) {
 		Label:           "test",
 		TemplateID:      1,
 		MaxUses:         1,
-		CreatedByUserID: "admin-id",
+		CreatedByUserID: "admin-id", BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +62,7 @@ func TestCreateInviteEncryptsRetainedTokenForCopyLinks(t *testing.T) {
 	if createdBy != "admin-id" {
 		t.Fatalf("created_by_user_id = %q", createdBy)
 	}
-	invites, err := store.ListInvites(ctx)
+	invites, err := store.InvitePage(ctx, 0, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestCreateInviteEncryptsRetainedTokenForCopyLinks(t *testing.T) {
 
 func TestInviteStateMutationsReportMissingRows(t *testing.T) {
 	ctx, store := testStore(t)
-	if err := store.SetInviteEnabled(ctx, 404, false); !errors.Is(err, ErrNotFound) {
+	if err := store.SetInviteEnabled(ctx, 404, 1, false); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("SetInviteEnabled missing error = %v, want ErrNotFound", err)
 	}
 	if err := store.DeleteInvite(ctx, 404); !errors.Is(err, ErrNotFound) {
@@ -108,7 +108,7 @@ func TestDeletedInviteCannotBeReenabledOrDeletedAgain(t *testing.T) {
 		TokenPrefix: "prefix",
 		Label:       "test",
 		TemplateID:  1,
-		MaxUses:     1,
+		MaxUses:     1, BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -119,7 +119,7 @@ func TestDeletedInviteCannotBeReenabledOrDeletedAgain(t *testing.T) {
 	if _, err := store.InvitePreset(ctx, inviteID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("InvitePreset deleted error = %v, want ErrNotFound", err)
 	}
-	if err := store.SetInviteEnabled(ctx, inviteID, true); !errors.Is(err, ErrNotFound) {
+	if err := store.SetInviteEnabled(ctx, inviteID, 1, true); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("SetInviteEnabled deleted error = %v, want ErrNotFound", err)
 	}
 	if err := store.DeleteInvite(ctx, inviteID); !errors.Is(err, ErrNotFound) {

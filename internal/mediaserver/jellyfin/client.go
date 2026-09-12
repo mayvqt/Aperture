@@ -28,7 +28,7 @@ var authorization = protocol.Authorization{
 	TokenInAuth: true,
 }
 
-func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, password string) (mediaserver.User, error) {
+func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, password string, created func(mediaserver.User) error) (mediaserver.User, error) {
 	var user mediaserver.User
 	if err := c.DoJSON(ctx, baseURL, http.MethodPost, "/Users/New", apiKey, map[string]string{
 		"Name": username, "Password": password,
@@ -38,7 +38,7 @@ func (c *Client) CreateUser(ctx context.Context, baseURL, apiKey, username, pass
 	if strings.TrimSpace(user.ID) == "" {
 		return mediaserver.User{}, errors.New("jellyfin create-user response was incomplete")
 	}
-	return user, nil
+	return user, created(user)
 }
 
 func normalizeURL(value string) (string, error) {

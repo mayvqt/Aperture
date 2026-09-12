@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mayvqt/aperture/internal/db"
+	"github.com/mayvqt/aperture/internal/mediaserver"
 	"github.com/mayvqt/aperture/internal/security"
 )
 
@@ -18,7 +18,7 @@ const registrationProvisioningTimeout = 2 * time.Minute
 
 func (s *Server) publicInvite(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	invite, err := s.validInvite(r.Context(), token)
+	invite, err := s.lookupInvite(r.Context(), token)
 	if err != nil {
 		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
 		return
@@ -56,7 +56,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 	}
 	username := strings.TrimSpace(r.FormValue("username"))
 	password := r.FormValue("password")
-	invite, err := s.validInvite(r.Context(), token)
+	invite, err := s.lookupInvite(r.Context(), token)
 	if err != nil {
 		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
 		return
@@ -70,6 +70,17 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		render(w, "public-invite", viewData{AuthTitle: "Create account · Aperture", Token: token, CSRF: csrf, Invite: invite, FormUsername: username, Error: validationError})
 		return
 	}
+	ctx, err := s.verifiedAPIContext(r.Context())
+	if err != nil {
+		s.message(w, "Registration unavailable", "Aperture could not verify the media server. Ask the server admin to check the connection.", http.StatusServiceUnavailable)
+		return
+	}
+	r = r.WithContext(ctx)
+	invite, err = s.validInvite(r.Context(), token)
+	if err != nil {
+		s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusNotFound)
+		return
+	}
 	settings, err := s.settings(r.Context())
 	if err != nil {
 		s.error(w, err)
@@ -79,7 +90,12 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.message(w, "Registration unavailable", "Ask the server admin to finish configuring account registration.", http.StatusServiceUnavailable)
 		return
 	}
-	regID, template, err := s.store.ReserveInviteUse(r.Context(), invite.ID, remoteIP, requestUserAgent(r), username)
+	op, err := operationSnapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	regID, template, err := s.store.ReserveInviteUse(r.Context(), invite.ID, invite.BindingID, remoteIP, requestUserAgent(r), username)
 	if err != nil {
 		if errors.Is(err, db.ErrInviteUnavailable) {
 			s.message(w, "Invite unavailable", "This invite is no longer available.", http.StatusConflict)
@@ -92,23 +108,29 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 	// even if the browser disconnects. The operation remains time-bounded.
 	provisionCtx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), registrationProvisioningTimeout)
 	defer cancel()
+	release, err := s.claimAccountOperations(regID)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	defer release()
 	r = r.WithContext(provisionCtx)
 	if err := s.store.BeginUserCreation(r.Context(), regID); err != nil {
 		s.error(w, err)
 		return
 	}
-	user, err := s.media.CreateUser(r.Context(), settings.ServerURL, settings.APIKey, username, password)
+	user, err := op.Media.CreateUser(r.Context(), settings.ServerURL, settings.APIKey, username, password, func(user mediaserver.User) error {
+		persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 5*time.Second)
+		defer persistCancel()
+		return s.store.RecordProvisioningUser(persistCtx, regID, user.ID)
+	})
 	provisioned := false
 	if user.ID != "" {
 		defer func() {
 			if provisioned {
 				return
 			}
-			cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(r.Context()), 10*time.Second)
-			defer cleanupCancel()
-			if err := s.media.DisableUser(cleanupCtx, settings.ServerURL, settings.APIKey, user.ID); err != nil {
-				slog.Error("could not disable incomplete account", "registration_id", regID, "error", safeError(err))
-			}
+			s.secureIncompleteAccount(r.Context(), regID, user.ID)
 		}()
 	}
 	if err != nil {
@@ -127,15 +149,15 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		}
 		slog.Warn("media-server user creation failed", "error", safeError(err))
 		s.notify(webhookNotice{Event: "registration.failed", Title: "Registration failed", Color: 0xe74c3c, Fields: map[string]string{"Username": username, "Registration": strconv.FormatInt(regID, 10), "Error": safeError(err)}})
-		s.message(w, "Registration failed", "The account could not be created. Ask the server admin to check this invite.", http.StatusInternalServerError)
+		s.message(w, "Registration failed", "Account setup could not be confirmed. Ask the server admin to check this invite before trying again.", http.StatusInternalServerError)
 		return
 	}
 	if err := s.store.RecordCreatedUser(r.Context(), regID, user.ID); err != nil {
 		s.error(w, err)
 		return
 	}
-	if err := s.media.ApplyTemplate(r.Context(), settings.ServerURL, settings.APIKey, user.ID, template); err != nil {
-		if recordErr := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationNeedsAttention, safeError(err), sql.NullTime{}); recordErr != nil {
+	if err := op.Media.ApplyTemplate(r.Context(), settings.ServerURL, settings.APIKey, user.ID, template); err != nil {
+		if recordErr := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationNeedsAttention, safeError(err)); recordErr != nil {
 			slog.Error("could not record partial media-server registration", "registration_id", regID, "error", safeError(recordErr))
 		}
 		slog.Warn("media-server template application failed", "error", safeError(err))
@@ -143,7 +165,7 @@ func (s *Server) publicRegister(w http.ResponseWriter, r *http.Request) {
 		s.message(w, "Account needs review", "The account was created, but an admin needs to finish applying access.", http.StatusAccepted)
 		return
 	}
-	if err := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationComplete, "", disableAtFor(invite.UserExpiryDays)); err != nil {
+	if err := s.store.CompleteRegistration(r.Context(), regID, db.RegistrationComplete, ""); err != nil && !s.accountCompletionConfirmed(r.Context(), regID, user.ID) {
 		s.error(w, err)
 		return
 	}

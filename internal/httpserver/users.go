@@ -15,26 +15,27 @@ import (
 var errAdministratorDelete = errors.New("cannot delete a media-server administrator")
 
 func (s *Server) usersList(w http.ResponseWriter, r *http.Request, session db.Session) {
-	settings, err := s.settings(r.Context())
+	op, err := operationSnapshot(r.Context())
 	if err != nil {
 		s.error(w, err)
 		return
 	}
+	settings := op.Settings
 	if strings.TrimSpace(settings.APIKey) == "" {
 		s.message(w, "API key required", "Save a media-server API key before synchronizing users.", http.StatusConflict)
 		return
 	}
-	liveUsers, err := s.media.ListUsers(r.Context(), settings.ServerURL, settings.APIKey)
+	liveUsers, err := op.Media.ListUsers(r.Context(), settings.ServerURL, settings.APIKey)
 	if err != nil {
 		s.message(w, "Could not synchronize users", "Aperture could not read users from the media server. Try again shortly.", http.StatusBadGateway)
 		return
 	}
-	managed, err := s.store.ListManagedUsers(r.Context())
+	managed, err := s.store.ListManagedUsers(r.Context(), op.Identity.Binding.ID)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	registrations, err := s.store.RegistrationUsers(r.Context())
+	registrations, err := s.store.RegistrationUsers(r.Context(), op.Identity.Binding.ID)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -46,17 +47,24 @@ func (s *Server) usersList(w http.ResponseWriter, r *http.Request, session db.Se
 
 func (s *Server) usersTrack(w http.ResponseWriter, r *http.Request, session db.Session) {
 	id := strings.TrimSpace(r.PathValue("id"))
-	settings, err := s.settings(r.Context())
+	op, err := operationSnapshot(r.Context())
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	user, found, err := s.media.GetUser(r.Context(), settings.ServerURL, settings.APIKey, id)
+	settings := op.Settings
+	releaseUser, err := s.claimMediaUser(op.Identity.Binding.ID, id)
+	if err != nil {
+		s.registrationRecoveryError(w, err)
+		return
+	}
+	defer releaseUser()
+	user, found, err := op.Media.GetUser(r.Context(), settings.ServerURL, settings.APIKey, id)
 	if err != nil {
 		s.message(w, "Could not synchronize users", "Aperture could not verify that user.", http.StatusBadGateway)
 		return
 	}
-	if !found {
+	if !found || user.ID != id {
 		s.message(w, "User not found", "That user no longer exists on the media server.", http.StatusNotFound)
 		return
 	}
@@ -64,7 +72,7 @@ func (s *Server) usersTrack(w http.ResponseWriter, r *http.Request, session db.S
 		s.message(w, "Cannot manage administrator", "Aperture does not manage media-server administrator accounts.", http.StatusConflict)
 		return
 	}
-	if err := s.store.SaveManagedUser(r.Context(), db.ManagedUser{ExternalUserID: user.ID, Username: user.Name}); err != nil {
+	if err := s.store.SaveManagedUser(r.Context(), db.ManagedUser{BindingID: op.Identity.Binding.ID, ExternalUserID: user.ID, Username: user.Name}); err != nil {
 		s.error(w, err)
 		return
 	}
@@ -81,10 +89,13 @@ func mergeUserRows(live []mediaserver.User, managed []db.ManagedUser, registrati
 		if policy.IsDisabled {
 			status, class = "Disabled", "warn"
 		}
+		if userIsAdministrator(user) && !policy.IsAdministrator {
+			status, class = "Policy unavailable", "warn"
+		}
 		if policy.IsAdministrator {
 			status, class = "Administrator", "warn"
 		}
-		rows[user.ID] = managedUserRow{ID: user.ID, Name: user.Name, Source: "External", Status: status, StatusClass: class, Administrator: policy.IsAdministrator}
+		rows[user.ID] = managedUserRow{ID: user.ID, Name: user.Name, Source: "External", Status: status, StatusClass: class, Administrator: userIsAdministrator(user)}
 	}
 	for _, user := range managed {
 		row, ok := rows[user.ExternalUserID]
@@ -115,8 +126,12 @@ func mergeUserRows(live []mediaserver.User, managed []db.ManagedUser, registrati
 }
 
 func userIsAdministrator(user mediaserver.User) bool {
-	var policy mediaserver.Policy
-	return json.Unmarshal(user.Policy, &policy) == nil && policy.IsAdministrator
+	// Unknown or ambiguous access flags must never permit account deletion.
+	if _, err := mediaserver.NormalizeTemplatePolicy(string(user.Policy)); err != nil {
+		return true
+	}
+	var policy struct{ IsAdministrator *bool }
+	return json.Unmarshal(user.Policy, &policy) != nil || policy.IsAdministrator == nil || *policy.IsAdministrator
 }
 
 func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.Session) {
@@ -125,12 +140,7 @@ func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.
 		s.message(w, "Invalid user", "That user does not exist.", http.StatusBadRequest)
 		return
 	}
-	settings, err := s.settings(r.Context())
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	deletedUpstream, err := s.deleteUserAndRecords(r.Context(), settings, id)
+	deletedUpstream, err := s.deleteUserAndRecords(r.Context(), id)
 	if err != nil {
 		s.userDeleteError(w, err, deletedUpstream)
 		return
@@ -139,17 +149,43 @@ func (s *Server) usersDelete(w http.ResponseWriter, r *http.Request, session db.
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
-func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings, id string) (bool, error) {
-	user, found, err := s.media.GetUser(ctx, settings.ServerURL, settings.APIKey, id)
+func (s *Server) deleteUserAndRecords(ctx context.Context, id string) (bool, error) {
+	op, err := operationSnapshot(ctx)
+	if err != nil {
+		return false, err
+	}
+	settings := op.Settings
+	if settings.APIKey == "" {
+		return false, errors.New("api key required")
+	}
+	releaseUser, err := s.claimMediaUser(op.Identity.Binding.ID, id)
+	if err != nil {
+		return false, err
+	}
+	defer releaseUser()
+	registrations, err := s.store.UserDeletionRegistrations(ctx, op.Identity.Binding.ID, id)
+	if err != nil {
+		return false, err
+	}
+	ids := make([]int64, 0, len(registrations))
+	for _, reg := range registrations {
+		ids = append(ids, reg.ID)
+	}
+	release, err := s.claimAccountOperations(ids...)
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	user, found, err := op.Media.GetUser(ctx, settings.ServerURL, settings.APIKey, id)
 	if err != nil {
 		return false, err
 	}
 	deletedUpstream := false
 	if found {
-		if userIsAdministrator(user) {
+		if user.ID != id || userIsAdministrator(user) {
 			return false, errAdministratorDelete
 		}
-		if err := s.media.DeleteUser(ctx, settings.ServerURL, settings.APIKey, id); err != nil {
+		if err := op.Media.DeleteUser(ctx, settings.ServerURL, settings.APIKey, id); err != nil {
 			var httpErr *mediaserver.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != http.StatusNotFound {
 				return false, err
@@ -158,13 +194,17 @@ func (s *Server) deleteUserAndRecords(ctx context.Context, settings db.Settings,
 			deletedUpstream = true
 		}
 	}
-	if err := s.store.DeleteUserRecords(ctx, id); err != nil {
+	if err := s.store.DeleteUserRecords(ctx, op.Identity.Binding.ID, id); err != nil {
 		return deletedUpstream, err
 	}
 	return deletedUpstream, nil
 }
 
 func (s *Server) userDeleteError(w http.ResponseWriter, err error, deletedUpstream bool) {
+	if errors.Is(err, db.ErrRegistrationTransition) || errors.Is(err, db.ErrNotFound) {
+		s.message(w, "User unavailable", "Only tracked accounts with no setup or recovery in progress can be deleted.", http.StatusConflict)
+		return
+	}
 	if errors.Is(err, errAdministratorDelete) {
 		s.message(w, "Cannot delete administrator", "Aperture does not delete media-server administrator accounts.", http.StatusConflict)
 		return

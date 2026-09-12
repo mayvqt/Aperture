@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -20,7 +19,7 @@ func TestPublicRegisterSchedulesUserDisable(t *testing.T) {
 	store := newFakeStore()
 	store.invite.UserExpiryDays = 7
 	media := &fakeMediaServer{}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	token := "public-invite-token"
 	csrf := "csrf-value"
 	form := url.Values{
@@ -66,7 +65,7 @@ func TestPublicRegisterSchedulesUserDisable(t *testing.T) {
 func TestPublicRegisterChecksTemplateBeforeReservingInvite(t *testing.T) {
 	store := newFakeStore()
 	store.templateErr = errors.New("template read failed")
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	token := "public-invite-token"
 	csrf := "csrf-value"
 	form := url.Values{
@@ -96,7 +95,7 @@ func TestPublicRegisterChecksTemplateBeforeReservingInvite(t *testing.T) {
 func TestPublicRegisterRetainsInviteUseAfterUncertainUserCreationFailure(t *testing.T) {
 	store := newFakeStore()
 	media := &fakeMediaServer{createErr: errors.New("create failed")}
-	handler := New(testConfig(), store, media)
+	handler := New(testConfig(), store, testMediaFactory(media))
 	token := "public-invite-token"
 	csrf := "csrf-value"
 	form := url.Values{
@@ -132,7 +131,7 @@ func TestPublicRegisterWithoutAPIKeyDoesNotConsumeInvite(t *testing.T) {
 	cfg := testConfig()
 	cfg.APIKey = ""
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 	token := "public-invite-token"
 	csrf := "csrf-value"
 	form := url.Values{
@@ -161,7 +160,7 @@ func TestPublicInviteShowsOnlyAccountCreationDetails(t *testing.T) {
 	store.invite.Label = "Admin label"
 	store.invite.Template = "Internal template"
 	store.invite.UserExpiryDays = 14
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/i/public-token", nil)
 	rr := httptest.NewRecorder()
 
@@ -189,7 +188,7 @@ func TestPublicInviteFailsEarlyWithoutAPIKey(t *testing.T) {
 	cfg := testConfig()
 	cfg.APIKey = ""
 	cfg.APIKeyManaged = false
-	handler := New(cfg, store, &fakeMediaServer{})
+	handler := New(cfg, store, testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/i/public-token", nil)
 	rr := httptest.NewRecorder()
 
@@ -206,7 +205,7 @@ func TestPublicInviteFailsEarlyWithoutAPIKey(t *testing.T) {
 func TestPublicInviteUnavailableDoesNotRevealDetails(t *testing.T) {
 	store := newFakeStore()
 	store.inviteErr = db.ErrNotFound
-	handler := New(testConfig(), store, &fakeMediaServer{})
+	handler := New(testConfig(), store, testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/i/missing-token", nil)
 	rr := httptest.NewRecorder()
 
@@ -222,7 +221,7 @@ func TestPublicInviteUnavailableDoesNotRevealDetails(t *testing.T) {
 }
 
 func TestGuideRendersAccountCreatedMessage(t *testing.T) {
-	handler := New(testConfig(), newFakeStore(), &fakeMediaServer{})
+	handler := New(testConfig(), newFakeStore(), testMediaFactory(&fakeMediaServer{}))
 	req := httptest.NewRequest(http.MethodGet, "/guide", nil)
 	rr := httptest.NewRecorder()
 
@@ -255,14 +254,14 @@ func (s *provisioningStore) RecordCreatedUser(ctx context.Context, id int64, use
 	return s.fakeStore.RecordCreatedUser(ctx, id, userID)
 }
 
-func (s *provisioningStore) CompleteRegistration(ctx context.Context, id int64, status, message string, expiry sql.NullTime) error {
+func (s *provisioningStore) CompleteRegistration(ctx context.Context, id int64, status, message string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if s.completeError != nil {
 		return s.completeError
 	}
-	return s.fakeStore.CompleteRegistration(ctx, id, status, message, expiry)
+	return s.fakeStore.CompleteRegistration(ctx, id, status, message)
 }
 
 type provisioningMedia struct {
@@ -271,8 +270,8 @@ type provisioningMedia struct {
 	partialError error
 }
 
-func (m *provisioningMedia) CreateUser(ctx context.Context, baseURL, key, username, password string) (mediaserver.User, error) {
-	user, err := m.fakeMediaServer.CreateUser(ctx, baseURL, key, username, password)
+func (m *provisioningMedia) CreateUser(ctx context.Context, baseURL, key, username, password string, created func(mediaserver.User) error) (mediaserver.User, error) {
+	user, err := m.fakeMediaServer.CreateUser(ctx, baseURL, key, username, password, created)
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -316,7 +315,7 @@ func TestPublicRegisterProtectsIncompleteProvisioning(t *testing.T) {
 			case "completion failure":
 				store.completeError = errors.New("database write failed")
 			}
-			handler := New(testConfig(), store, media)
+			handler := New(testConfig(), store, testMediaFactory(media))
 			token, csrf := "public-invite-token", "csrf-value"
 			form := url.Values{"csrf": {csrf}, "username": {"new_user"}, "password": {"correct horse"}, "confirm_password": {"correct horse"}}
 			req := httptest.NewRequest(http.MethodPost, "/i/"+token+"/register", strings.NewReader(form.Encode())).WithContext(ctx)

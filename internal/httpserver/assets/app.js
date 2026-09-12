@@ -54,16 +54,25 @@ document.addEventListener("submit", function (event) {
 });
 
 var adminNav = document.querySelector("nav.admin-nav");
-if (adminNav) {
-    var currentNavItem = adminNav.querySelector('a[aria-current="page"]');
-    var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (currentNavItem && adminNav.scrollWidth > adminNav.clientWidth) {
-        currentNavItem.scrollIntoView({
-            block: "nearest",
-            inline: "nearest",
-            behavior: reducedMotion.matches ? "auto" : "smooth"
-        });
+var navToggle = document.querySelector(".nav-toggle");
+if (adminNav && navToggle) {
+    var compactNav = window.matchMedia("(max-width: 1079px)");
+    function setNavOpen(open) {
+        adminNav.hidden = compactNav.matches && !open;
+        navToggle.setAttribute("aria-expanded", String(!adminNav.hidden));
     }
+    navToggle.hidden = false;
+    setNavOpen(false);
+    navToggle.addEventListener("click", function () {
+        setNavOpen(adminNav.hidden);
+    });
+    compactNav.addEventListener("change", function () { setNavOpen(false); });
+    adminNav.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && compactNav.matches) {
+            setNavOpen(false);
+            navToggle.focus();
+        }
+    });
 }
 
 var animatingWorkflows = new WeakSet();

@@ -11,22 +11,39 @@ import (
 )
 
 func (s *Server) invitesList(w http.ResponseWriter, r *http.Request, session db.Session) {
-	invites, err := s.store.ListInvites(r.Context())
+	before := historyCursor(r)
+	invites, err := s.store.InvitePage(r.Context(), before, 51)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	activity, err := s.store.LatestInviteActivity(r.Context())
+	next := int64(0)
+	if len(invites) > 50 {
+		invites = invites[:50]
+		next = invites[49].ID
+	}
+	ids := make([]int64, len(invites))
+	for i, invite := range invites {
+		ids[i] = invite.ID
+	}
+	activity, err := s.store.InvitePageActivity(r.Context(), ids)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
 	data := s.data(r, session)
+	data.HistoryBefore = before
+	data.NextBefore = next
 	data.Invites = invites
 	data.InviteRows = inviteRows(invites, activity)
 	_, publicURL, _ := s.runtimeSettings()
 	data.PublicURL = strings.TrimRight(publicURL, "/")
-	data.Stats = dashboardStatsFrom(invites, nil)
+	counts, err := s.store.DashboardCounts(r.Context(), session.BindingID)
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	data.Stats.ActiveInvites = counts.ActiveInvites
 	render(w, "invites", data)
 }
 func (s *Server) invitesNew(w http.ResponseWriter, r *http.Request, session db.Session) {
@@ -96,6 +113,7 @@ func (s *Server) invitesCreate(w http.ResponseWriter, r *http.Request, session d
 	}
 	hash := security.HashToken(settings.InviteSecret, token)
 	inviteID, err := s.store.CreateInvite(r.Context(), db.Invite{
+		BindingID:       session.BindingID,
 		TokenHash:       hash,
 		TokenPrefix:     security.Prefix(token),
 		Token:           token,
@@ -139,7 +157,7 @@ func (s *Server) setInviteState(w http.ResponseWriter, r *http.Request, session 
 		s.message(w, "Invalid invite", "That invite does not exist.", http.StatusBadRequest)
 		return
 	}
-	if err := s.store.SetInviteEnabled(r.Context(), id, enabled); err != nil {
+	if err := s.store.SetInviteEnabled(r.Context(), id, session.BindingID, enabled); err != nil {
 		s.inviteError(w, err)
 		return
 	}

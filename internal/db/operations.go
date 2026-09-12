@@ -2,8 +2,6 @@ package db
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"time"
 )
 
@@ -83,8 +81,8 @@ func (s *Store) DeleteWebhook(ctx context.Context, id int64) error {
 	}
 	return err
 }
-func (s *Store) DueTemplateRecoveries(ctx context.Context, limit int) ([]RegistrationRecovery, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT r.id FROM registrations r WHERE r.external_user_id IS NOT NULL AND r.status IN (?,?) AND r.template_attempts < 6 AND (r.next_template_attempt_at IS NULL OR r.next_template_attempt_at <= CURRENT_TIMESTAMP) ORDER BY COALESCE(r.next_template_attempt_at,r.updated_at),r.id LIMIT ?`, RegistrationNeedsAttention, RegistrationFailedApplyTemplate, limit)
+func (s *Store) ListDueTemplateRecoveryIDs(ctx context.Context, bindingID int64, limit int) ([]int64, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT r.id FROM registrations r WHERE r.binding_id = ? AND r.external_user_id IS NOT NULL AND r.status IN (?,?) AND r.template_attempts < 6 AND (r.next_template_attempt_at IS NULL OR r.next_template_attempt_at <= CURRENT_TIMESTAMP) ORDER BY COALESCE(r.next_template_attempt_at,r.updated_at),r.id LIMIT ?`, bindingID, RegistrationNeedsAttention, RegistrationFailedApplyTemplate, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +98,5 @@ func (s *Store) DueTemplateRecoveries(ctx context.Context, limit int) ([]Registr
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	var out []RegistrationRecovery
-	for _, id := range ids {
-		v, err := s.ClaimTemplateRecovery(ctx, id)
-		if errors.Is(err, ErrRegistrationTransition) || errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	return out, nil
+	return ids, nil
 }

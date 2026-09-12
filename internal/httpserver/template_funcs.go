@@ -18,6 +18,25 @@ type templateSummaryItem struct {
 }
 
 var templateFuncs = template.FuncMap{
+	"registrationActive": db.IsRegistrationActive,
+	"registrationNextRetry": func(reg db.Registration) string {
+		if reg.CleanupPending || reg.Status == db.RegistrationDisableFailed {
+			if reg.NextDisableAttemptAt.Valid {
+				return reg.NextDisableAttemptAt.Time.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			return "Disable pending"
+		}
+		if db.CanRetryRegistrationTemplate(reg.Status) {
+			if reg.TemplateAttempts >= 6 {
+				return "Review needed"
+			}
+			if reg.NextTemplateAttemptAt.Valid {
+				return reg.NextTemplateAttemptAt.Time.UTC().Format("2006-01-02 15:04 UTC")
+			}
+			return "Access retry pending"
+		}
+		return "—"
+	},
 	"stylesheetHash": func() string { return stylesheetHash },
 	"scriptHash":     func() string { return scriptHash },
 	"boolText": func(v bool) string {
@@ -48,7 +67,7 @@ var templateFuncs = template.FuncMap{
 		case db.RegistrationNeedsAttention, db.RegistrationFailedApplyTemplate:
 			return "Review needed"
 		case db.RegistrationFailedCreateUser:
-			return "Account not created"
+			return "Setup incomplete"
 		case db.RegistrationDisableFailed:
 			return "Could not disable"
 		case db.RegistrationDisabledExpired:
@@ -59,23 +78,16 @@ var templateFuncs = template.FuncMap{
 			return "In progress"
 		}
 	},
-	"inviteState": func(enabled bool, uses, maxUses int) string {
-		if !enabled {
-			return "Disabled"
-		}
-		if uses >= maxUses {
-			return "Used"
-		}
-		return "Active"
-	},
-	"inviteStateClass": func(enabled bool, uses, maxUses int) string {
-		if !enabled {
+	"inviteState": inviteState,
+	"inviteStateClass": func(invite db.Invite, bindingID int64) string {
+		switch inviteState(invite, bindingID) {
+		case "Active":
+			return "good"
+		case "Disabled":
 			return "bad"
-		}
-		if uses >= maxUses {
+		default:
 			return "warn"
 		}
-		return "good"
 	},
 	"inviteURL": func(publicURL, token string) string {
 		if token == "" {
@@ -182,4 +194,23 @@ func presenceText(count int) string {
 		return "Default"
 	}
 	return fmt.Sprintf("%d settings", count)
+}
+
+func inviteState(invite db.Invite, bindingID int64) string {
+	if invite.BindingID != bindingID || bindingID <= 0 {
+		if invite.BindingID == 0 {
+			return "Unverified server"
+		}
+		return "Previous server"
+	}
+	if !invite.Enabled {
+		return "Disabled"
+	}
+	if invite.ExpiresAt.Valid && !invite.ExpiresAt.Time.After(time.Now()) {
+		return "Expired"
+	}
+	if invite.Uses >= invite.MaxUses {
+		return "Used"
+	}
+	return "Active"
 }

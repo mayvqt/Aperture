@@ -23,7 +23,8 @@ type Server interface {
 	Authenticate(context.Context, string, string, string) (AuthResult, error)
 	IsAdmin(context.Context, string, string, string, string) (bool, error)
 	Ping(context.Context, string, string) error
-	CreateUser(context.Context, string, string, string, string) (User, error)
+	Inspect(context.Context, string, string, string) (ServerInfo, error)
+	CreateUser(context.Context, string, string, string, string, func(User) error) (User, error)
 	ApplyTemplate(context.Context, string, string, string, db.Template) error
 	DisableUser(context.Context, string, string, string) error
 	GetUser(context.Context, string, string, string) (User, bool, error)
@@ -38,6 +39,11 @@ type AuthResult struct {
 	AccessToken string
 	DeviceID    string
 	IsAdmin     bool
+}
+
+type ServerInfo struct {
+	ID   string `json:"Id"`
+	Name string `json:"ServerName"`
 }
 
 type User struct {

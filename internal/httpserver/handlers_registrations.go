@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,12 +10,20 @@ import (
 )
 
 func (s *Server) registrationsList(w http.ResponseWriter, r *http.Request, session db.Session) {
-	regs, err := s.store.RecentRegistrations(r.Context(), 100)
+	before := historyCursor(r)
+	review := r.URL.Query().Get("review") == "1"
+	regs, err := s.store.RegistrationPage(r.Context(), session.BindingID, before, review, 51)
 	if err != nil {
 		s.error(w, err)
 		return
 	}
 	data := s.data(r, session)
+	data.HistoryBefore = before
+	data.ReviewOnly = review
+	if len(regs) > 50 {
+		regs = regs[:50]
+		data.NextBefore = regs[49].ID
+	}
 	data.Registrations = regs
 	render(w, "registrations", data)
 }
@@ -36,26 +43,14 @@ func (s *Server) registrationsRetryTemplate(w http.ResponseWriter, r *http.Reque
 		s.message(w, "API key required", "Save a media-server API key before retrying template application.", http.StatusConflict)
 		return
 	}
-	recovery, err := s.store.ClaimTemplateRecovery(r.Context(), id)
-	if err != nil {
-		s.registrationRecoveryError(w, err)
+	if err := s.recoverAccount(r.Context(), id, false); err != nil {
+		if errors.Is(err, db.ErrNotFound) || errors.Is(err, db.ErrRegistrationTransition) {
+			s.registrationRecoveryError(w, err)
+		} else {
+			s.message(w, "Template retry failed", "Access could not be confirmed. Aperture will keep trying to disable the incomplete account; review the registration details before trying again.", http.StatusBadGateway)
+		}
 		return
 	}
-	if strings.TrimSpace(recovery.Template.PolicyJSON) == "" {
-		s.recordTemplateRetryFailure(r, id, errors.New("saved registration template is unavailable"))
-		s.message(w, "Recovery unavailable", "The saved registration template is unavailable.", http.StatusConflict)
-		return
-	}
-	if err := s.media.ApplyTemplate(r.Context(), settings.ServerURL, settings.APIKey, recovery.Registration.ExternalUserID.String, recovery.Template); err != nil {
-		s.recordTemplateRetryFailure(r, id, err)
-		s.message(w, "Template retry failed", "The media server did not accept the template. Review the saved details and try again.", http.StatusBadGateway)
-		return
-	}
-	if err := s.store.CompleteTemplateRecovery(r.Context(), id, disableAtFrom(recovery.Registration.CreatedAt, recovery.UserExpiryDays)); err != nil {
-		s.registrationRecoveryError(w, err)
-		return
-	}
-	s.notify(webhookNotice{Event: "template.recovered", Title: "Access template recovered", Color: 0x2ecc71, Fields: map[string]string{"Username": recovery.Registration.Username, "Registration": strconv.FormatInt(id, 10), "Template": recovery.Template.Name}})
 	s.audit(r, session, "registration.retry_template", "registration", strconv.FormatInt(id, 10), nil)
 	http.Redirect(w, r, "/admin/registrations", http.StatusSeeOther)
 }
@@ -71,6 +66,15 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 		s.registrationRecoveryError(w, err)
 		return
 	}
+	op, err := operationSnapshot(r.Context())
+	if err != nil {
+		s.error(w, err)
+		return
+	}
+	if registration.BindingID != op.Identity.Binding.ID {
+		s.message(w, "Server review needed", "Assign this registration to the correct server before managing its account.", http.StatusConflict)
+		return
+	}
 	deletedUpstream := false
 	if registration.ExternalUserID.Valid && strings.TrimSpace(registration.ExternalUserID.String) != "" {
 		settings, err := s.settings(r.Context())
@@ -82,14 +86,22 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 			s.message(w, "API key required", "Aperture must verify that the media-server user has been deleted first.", http.StatusConflict)
 			return
 		}
-		deletedUpstream, err = s.deleteUserAndRecords(r.Context(), settings, registration.ExternalUserID.String)
+		deletedUpstream, err = s.deleteUserAndRecords(r.Context(), registration.ExternalUserID.String)
 		if err != nil {
 			s.userDeleteError(w, err, deletedUpstream)
 			return
 		}
-	} else if err := s.store.DeleteRegistration(r.Context(), id); err != nil {
-		s.registrationRecoveryError(w, err)
-		return
+	} else {
+		release, err := s.claimAccountOperations(id)
+		if err != nil {
+			s.registrationRecoveryError(w, err)
+			return
+		}
+		defer release()
+		if err := s.store.DeleteRegistration(r.Context(), id); err != nil {
+			s.registrationRecoveryError(w, err)
+			return
+		}
 	}
 	s.audit(r, session, "registration.delete", "registration", strconv.FormatInt(id, 10), map[string]any{"username": registration.Username, "deleted_from_media_server": deletedUpstream})
 	destination := "/admin/registrations"
@@ -97,12 +109,6 @@ func (s *Server) registrationsDelete(w http.ResponseWriter, r *http.Request, ses
 		destination = "/admin"
 	}
 	http.Redirect(w, r, destination, http.StatusSeeOther)
-}
-
-func (s *Server) recordTemplateRetryFailure(r *http.Request, registrationID int64, err error) {
-	if recordErr := s.store.RecordTemplateRetryFailure(r.Context(), registrationID, safeError(err)); recordErr != nil {
-		slog.Error("could not record template retry failure", "registration_id", registrationID, "error", safeError(recordErr))
-	}
 }
 
 func (s *Server) registrationRecoveryError(w http.ResponseWriter, err error) {

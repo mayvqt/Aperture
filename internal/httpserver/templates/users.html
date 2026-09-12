@@ -1,7 +1,7 @@
 {{define "users"}}{{template "base-start" .}}
 <div class="page-head">
     <div><p class="eyebrow">Media server</p><h1>Users</h1><p>Live accounts synchronized from Jellyfin or Emby. External accounts remain read-only until you track them.</p></div>
-    <a class="button secondary" href="/admin/users">Sync now</a>
+    <div class="actions"><a class="button secondary" href="/admin/users/review">Tracked user history</a><a class="button secondary" href="/admin/users">Sync now</a></div>
 </div>
 <div class="table-wrap users-table"><table>
     <thead><tr><th>User</th><th>Status</th><th>Managed by</th><th>Account ID</th><th>Action</th></tr></thead>
@@ -12,7 +12,7 @@
         <td><code title="{{.ID}}">{{shortID .ID}}</code></td>
         <td><div class="row-actions">
             {{if and (not .Tracked) (not .Administrator)}}<form action="/admin/users/{{.ID}}/track" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="secondary small">Track</button></form>{{end}}
-            {{if .Tracked}}<form action="/admin/users/{{.ID}}/delete" data-confirm="Delete {{.Name}} from the media server and remove Aperture's local record?" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="danger small">Delete</button></form>{{end}}
+            {{if and .Tracked (not .Administrator)}}<form action="/admin/users/{{.ID}}/delete" data-confirm="Delete {{.Name}} from the media server and remove Aperture's local record?" method="post"><input name="csrf" type="hidden" value="{{$.CSRF}}"><button class="danger small">Delete</button></form>{{end}}
         </div></td>
     </tr>{{else}}<tr><td colspan="5">No users found.</td></tr>{{end}}</tbody>
 </table></div>

@@ -22,8 +22,8 @@ var webhookEventOptions = []webhookEventOption{
 	{"registration.failed", "Registration failed"},
 	{"template.failed", "Template application failed"},
 	{"template.recovered", "Template access recovered"},
-	{"user.disabled", "Expired user disabled"},
-	{"user.disable_failed", "Expired-user disable failed"},
+	{"user.disabled", "Account disabled"},
+	{"user.disable_failed", "Account disable failed"},
 }
 
 type webhookNotice struct {
@@ -55,7 +55,9 @@ type discordField struct {
 }
 
 func (s *Server) notify(n webhookNotice) {
-	hooks, err := s.store.ListWebhooks(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	hooks, err := s.store.ListWebhooks(ctx)
 	if err != nil {
 		slog.Warn("could not list notification webhooks", "error", safeError(err))
 		return

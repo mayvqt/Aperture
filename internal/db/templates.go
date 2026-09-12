@@ -90,8 +90,13 @@ func (s *Store) SetDefaultTemplate(ctx context.Context, id int64) error {
 }
 
 func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
 	var isDefault bool
-	if err := s.db.QueryRowContext(ctx, `SELECT is_default FROM templates WHERE id = ?`, id).Scan(&isDefault); errors.Is(err, sql.ErrNoRows) {
+	if err := tx.QueryRowContext(ctx, `SELECT is_default FROM templates WHERE id = ?`, id).Scan(&isDefault); errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	} else if err != nil {
 		return err
@@ -100,14 +105,17 @@ func (s *Store) DeleteTemplate(ctx context.Context, id int64) error {
 		return ErrTemplateIsDefault
 	}
 	var uses int
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE template_id = ?`, id).Scan(&uses); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM invites WHERE template_id = ?`, id).Scan(&uses); err != nil {
 		return err
 	}
 	if uses > 0 {
 		return ErrTemplateInUse
 	}
-	_, err := s.db.ExecContext(ctx, `DELETE FROM templates WHERE id = ?`, id)
-	return err
+	_, err = tx.ExecContext(ctx, `DELETE FROM templates WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func scanTemplate(scanner rowScanner) (Template, error) {

@@ -119,7 +119,7 @@ func TestUpdateApplicationSettingsWritesAtomically(t *testing.T) {
 	publicURL := "https://join.example.com"
 	url := "http://media:8096/emby"
 	apiKey := "api-key"
-	if err := store.UpdateApplicationSettings(ctx, &provider, &publicURL, &url, &apiKey); err != nil {
+	if _, err := store.PublishMediaConnection(ctx, ConnectionUpdate{ExpectedGeneration: 1, Origin: MediaBinding{Provider: provider, BaseURL: url, ServerID: "emby-server"}, Provider: &provider, PublicURL: &publicURL, ServerURL: &url, APIKey: &apiKey}); err != nil {
 		t.Fatal(err)
 	}
 	settings, err := store.Settings(ctx)
@@ -152,25 +152,11 @@ func TestUpdateApplicationSettingsRollsBackPartialWrite(t *testing.T) {
 	}
 	url := "http://must-not-persist:8096"
 	apiKey := "api-key"
-	if err := store.UpdateApplicationSettings(ctx, nil, nil, &url, &apiKey); err == nil {
+	if _, err := store.PublishMediaConnection(ctx, ConnectionUpdate{ExpectedGeneration: 1, Origin: MediaBinding{Provider: "jellyfin", BaseURL: url, ServerID: "other-server"}, ServerURL: &url, APIKey: &apiKey}); err == nil {
 		t.Fatal("atomic settings update unexpectedly succeeded")
 	}
 	if _, err := store.Setting(ctx, "server_url"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("server URL survived rolled-back update: %v", err)
-	}
-}
-
-func TestValidateMediaProviderRejectsProviderSwitch(t *testing.T) {
-	ctx, store := testStore(t)
-	provider := "emby"
-	if err := store.UpdateApplicationSettings(ctx, &provider, nil, nil, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.ValidateMediaProvider(ctx, "jellyfin"); err == nil {
-		t.Fatal("provider switch was accepted")
-	}
-	if err := store.ValidateMediaProvider(ctx, "emby"); err != nil {
-		t.Fatalf("matching provider rejected: %v", err)
 	}
 }
 

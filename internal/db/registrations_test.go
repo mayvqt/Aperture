@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -15,16 +14,16 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 		Label:          "test",
 		TemplateID:     1,
 		MaxUses:        3,
-		UserExpiryDays: 7,
+		UserExpiryDays: 7, BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	dueRegID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	dueRegID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
-	futureRegID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "bob")
+	futureRegID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "bob")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,14 +38,20 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, futureRegID, "jellyfin-bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, dueRegID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(-time.Hour).UTC(), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(-time.Hour).UTC(), time.Now().Add(-time.Hour).UTC(), dueRegID); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, futureRegID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(time.Hour).UTC(), Valid: true}); err != nil {
+	if err := store.CompleteRegistration(ctx, dueRegID, RegistrationComplete, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(time.Hour).UTC(), time.Now().Add(time.Hour).UTC(), futureRegID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, futureRegID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 
-	due, err := store.DueUserDisables(ctx, 10)
+	due, err := store.DueUserDisables(ctx, 1, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +61,7 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 	if err := store.MarkUserDisabled(ctx, dueRegID); err != nil {
 		t.Fatal(err)
 	}
-	due, err = store.DueUserDisables(ctx, 10)
+	due, err = store.DueUserDisables(ctx, 1, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,12 +75,21 @@ func TestDueUserDisablesOnlyReturnsDueEnabledUsers(t *testing.T) {
 
 func TestDeleteRegistrationRemovesOnlyTheHistoryRecord(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "delete-history", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "delete-history", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteRegistration(ctx, registrationID); !errors.Is(err, ErrRegistrationTransition) {
+		t.Fatalf("deleted active reservation: %v", err)
+	}
+	if err := store.BeginUserCreation(ctx, registrationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.FailUserCreation(ctx, registrationID, "creation rejected"); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.DeleteRegistration(ctx, registrationID); err != nil {
@@ -84,7 +98,7 @@ func TestDeleteRegistrationRemovesOnlyTheHistoryRecord(t *testing.T) {
 	if _, err := store.Registration(ctx, registrationID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("lookup after delete error = %v, want ErrNotFound", err)
 	}
-	invite, err := store.InviteByHash(ctx, "delete-history")
+	invite, err := store.InviteByHash(ctx, "delete-history", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,11 +109,11 @@ func TestDeleteRegistrationRemovesOnlyTheHistoryRecord(t *testing.T) {
 
 func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-backoff", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-backoff", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +123,10 @@ func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, registrationID, "jf-alice"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(-time.Hour), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(-time.Hour).UTC(), time.Now().Add(-time.Hour).UTC(), registrationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 	before := time.Now().UTC()
@@ -127,7 +144,7 @@ func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 	if reg.NextDisableAttemptAt.Time.Before(before.Add(30*time.Second)) || reg.NextDisableAttemptAt.Time.After(before.Add(2*time.Minute)) {
 		t.Fatalf("next attempt = %s, want about one minute after failure", reg.NextDisableAttemptAt.Time)
 	}
-	due, err := store.DueUserDisables(ctx, 10)
+	due, err := store.DueUserDisables(ctx, 1, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,11 +155,11 @@ func TestDisableFailureUsesDurableExponentialBackoff(t *testing.T) {
 
 func TestCompleteRegistrationRejectsRepeatedTransition(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-transition", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-transition", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,21 +169,21 @@ func TestCompleteRegistrationRejectsRepeatedTransition(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, registrationID, "jf-alice"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{}); err != nil {
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, "", sql.NullTime{}); !errors.Is(err, ErrRegistrationTransition) {
+	if err := store.CompleteRegistration(ctx, registrationID, RegistrationComplete, ""); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("second CompleteRegistration error = %v, want ErrRegistrationTransition", err)
 	}
 }
 
 func TestUncertainUserCreationRetainsInviteUseAndNullUserID(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-uncertain", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "hash-uncertain", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	registrationID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +200,7 @@ func TestUncertainUserCreationRetainsInviteUseAndNullUserID(t *testing.T) {
 	if regs[0].ExternalUserID.Valid || regs[0].Status != RegistrationFailedCreateUser {
 		t.Fatalf("uncertain registration = %#v", regs[0])
 	}
-	if _, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "bob"); !errors.Is(err, ErrInviteUnavailable) {
+	if _, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "bob"); !errors.Is(err, ErrInviteUnavailable) {
 		t.Fatalf("second reservation error = %v, want ErrInviteUnavailable", err)
 	}
 }
@@ -195,19 +212,19 @@ func TestLatestInviteActivityReturnsNewestRegistrationPerInvite(t *testing.T) {
 		TokenPrefix: "prefix",
 		Label:       "Family",
 		TemplateID:  1,
-		MaxUses:     5,
+		MaxUses:     5, BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice"); err != nil {
+	if _, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice"); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "bob"); err != nil {
+	if _, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "bob"); err != nil {
 		t.Fatal(err)
 	}
 
-	activity, err := store.LatestInviteActivity(ctx)
+	activity, err := store.InvitePageActivity(ctx, []int64{inviteID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,16 +239,16 @@ func TestDashboardCountsCoverFullHistory(t *testing.T) {
 		TokenHash:  "hash-dashboard",
 		Label:      "Dashboard",
 		TemplateID: 1,
-		MaxUses:    3,
+		MaxUses:    3, BindingID: 1,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	attentionID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	attentionID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
-	scheduledID, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "bob")
+	scheduledID, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "bob")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,14 +263,17 @@ func TestDashboardCountsCoverFullHistory(t *testing.T) {
 	if err := store.RecordCreatedUser(ctx, scheduledID, "jf-bob"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, attentionID, RegistrationNeedsAttention, "policy failed", sql.NullTime{}); err != nil {
+	if err := store.CompleteRegistration(ctx, attentionID, RegistrationNeedsAttention, "policy failed"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CompleteRegistration(ctx, scheduledID, RegistrationComplete, "", sql.NullTime{Time: time.Now().Add(time.Hour), Valid: true}); err != nil {
+	if _, err := store.db.ExecContext(ctx, `UPDATE registrations SET user_disable_at = ?, next_disable_attempt_at = ? WHERE id = ?`, time.Now().Add(time.Hour).UTC(), time.Now().Add(time.Hour).UTC(), scheduledID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.CompleteRegistration(ctx, scheduledID, RegistrationComplete, ""); err != nil {
 		t.Fatal(err)
 	}
 
-	counts, err := store.DashboardCounts(ctx)
+	counts, err := store.DashboardCounts(ctx, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -264,11 +284,11 @@ func TestDashboardCountsCoverFullHistory(t *testing.T) {
 
 func TestPartialUserCreationCannotRetryTemplate(t *testing.T) {
 	ctx, store := testStore(t)
-	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "partial-account", TemplateID: 1, MaxUses: 1})
+	inviteID, err := store.CreateInvite(ctx, Invite{TokenHash: "partial-account", TemplateID: 1, MaxUses: 1, BindingID: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, _, err := store.ReserveInviteUse(ctx, inviteID, "127.0.0.1", "test", "alice")
+	id, _, err := store.ReserveInviteUse(ctx, inviteID, 1, "127.0.0.1", "test", "alice")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,16 +311,16 @@ func TestPartialUserCreationCannotRetryTemplate(t *testing.T) {
 	if registration.Status != RegistrationFailedCreateUser || registration.ExternalUserID.String != "partial-user" {
 		t.Fatalf("partial account was not durably isolated: status=%q id=%q", registration.Status, registration.ExternalUserID.String)
 	}
-	if _, err := store.ClaimTemplateRecovery(ctx, id); !errors.Is(err, ErrRegistrationTransition) {
+	if _, err := store.ClaimTemplateRecovery(ctx, id, 1, false); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("partial account allowed manual template retry: %v", err)
 	}
-	if due, err := store.DueTemplateRecoveries(ctx, 10); err != nil || len(due) != 0 {
+	if due, err := store.ListDueTemplateRecoveryIDs(ctx, 1, 10); err != nil || len(due) != 0 {
 		t.Fatalf("partial account allowed automatic template retry: count=%d err=%v", len(due), err)
 	}
 	if err := store.RecordFailedUserCreation(ctx, id, "other-user", "replacement"); !errors.Is(err, ErrRegistrationTransition) {
 		t.Fatalf("partial account allowed repeated transition: %v", err)
 	}
-	invite, err := store.InviteByHash(ctx, "partial-account")
+	invite, err := store.InviteByHash(ctx, "partial-account", 1)
 	if err != nil || invite.Uses != 1 {
 		t.Fatalf("partial creation released invite use: uses=%d err=%v", invite.Uses, err)
 	}

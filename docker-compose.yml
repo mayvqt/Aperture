@@ -6,6 +6,7 @@ services:
     image: aperture:local
     container_name: aperture
     restart: unless-stopped
+    stop_grace_period: 270s
     init: true
     security_opt:
       - no-new-privileges:true

@@ -32,7 +32,7 @@
     </div>
     <div class="metric">
         <strong>{{.Stats.NeedsAttention}}</strong>
-        <span>review needed</span>
+        <a href="/admin/registrations?review=1">review needed</a>
     </div>
     <div class="metric">
         <strong>{{.Stats.ScheduledUserDisables}}</strong>
@@ -60,7 +60,7 @@
                     <td>{{.Label}}</td>
                     <td>{{.Uses}} / {{.MaxUses}}</td>
                     <td>
-                        <span class="status {{inviteStateClass .Enabled .Uses .MaxUses}}">{{inviteState .Enabled .Uses .MaxUses}}</span>
+                        <span class="status {{inviteStateClass . $.BindingID}}">{{inviteState . $.BindingID}}</span>
                     </td>
                     <td>{{userExpiryText .UserExpiryDays}}</td>
                 </tr>
@@ -91,16 +91,16 @@
                 </thead>
                 <tbody>{{range .Registrations}}
                 <tr>
-                    <td>{{.Username}}</td>
+                    <td>{{.Username}}{{if ne .BindingID $.BindingID}}<small> · {{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</td>
                     <td>
                         <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
                     </td>
                     <td>{{nullDate .UserDisableAt}}</td>
-                    <td>{{nullDateTime .NextDisableAttemptAt}}</td>
-                    <td><form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
+                    <td>{{registrationNextRetry .}}</td>
+                    <td>{{if and (eq .BindingID $.BindingID) (not (registrationActive .Status))}}<form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}"><input name="return_to" type="hidden" value="/admin">
                         <button class="danger small">Remove</button>
-                    </form></td>
+                    </form>{{end}}</td>
                 </tr>
                 {{else}}
                 <tr>
@@ -132,7 +132,7 @@
                 <option value="jellyfin" {{if eq .Provider "jellyfin"}}selected{{end}}>Jellyfin</option>
                 <option value="emby" {{if eq .Provider "emby"}}selected{{end}}>Emby</option>
             </select>
-                {{if not .ProviderManaged}}<span class="hint">Changing the provider or server signs you out. Existing account history still refers to the previous server.</span>{{end}}
+                {{if not .ProviderManaged}}<span class="hint">Changing the provider or server signs you out. Saved invites and accounts stay with their original server. Review records individually before assigning them to another server.</span>{{end}}
             </label>
             <label>Aperture URL{{if .PublicURLManaged}}<span class="hint">Managed by APERTURE_PUBLIC_URL.</span>{{else}}<span
                     class="hint">The address used in invite links.</span>{{end}}<input
@@ -166,6 +166,7 @@
     <div>
         <p class="eyebrow">Account history</p>
         <h1>Registrations</h1>
+ <p><a href="/admin/registrations">All history</a> · <a href="/admin/registrations?review=1">Needs review</a></p>
         <p>Accounts created from invite links and any follow-up work.</p>
     </div>
 </div>
@@ -185,25 +186,25 @@
         </thead>
         <tbody>{{range .Registrations}}
         <tr>
-            <td>{{.Username}}</td>
+            <td>{{.Username}}{{if ne .BindingID $.BindingID}}<small> · {{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</td>
             <td>
                 <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
             </td>
             <td>{{.ExternalUserID.String}}</td>
-            <td><span class="cell-stack">Ends {{nullDate .UserDisableAt}}<small>Disabled {{nullDate .UserDisabledAt}}</small></span></td>
-            <td><span class="cell-stack">{{.DisableAttempts}} attempts<small>Next {{nullDateTime .NextDisableAttemptAt}}</small></span></td>
-			<td><span class="cell-stack">{{.TemplateAttempts}} attempts<small>Next {{nullDateTime .NextTemplateAttemptAt}}</small></span></td>
-            <td><div class="row-actions">{{if canRetryTemplate .Status .ExternalUserID}}
+            <td><span class="cell-stack">{{if .UserDisableAt.Valid}}Ends {{nullDate .UserDisableAt}}{{else}}No expiry{{end}}{{if .UserDisabledAt.Valid}}<small>Disabled {{nullDate .UserDisabledAt}}</small>{{end}}</span></td>
+            <td><span class="cell-stack">{{if .CleanupPending}}Disable pending{{else}}{{.DisableAttempts}} attempts{{end}}{{if .CleanupError.Valid}}<small>Last attempt failed</small>{{end}}{{if and .NextDisableAttemptAt.Valid (not .UserDisabledAt.Valid)}}<small>Next {{nullDateTime .NextDisableAttemptAt}}</small>{{end}}</span></td>
+			<td><span class="cell-stack">{{.TemplateAttempts}} attempts{{if canRetryTemplate .Status .ExternalUserID}}<small>{{if ge .TemplateAttempts 6}}Automatic retries finished; review access{{else if .NextTemplateAttemptAt.Valid}}Next {{nullDateTime .NextTemplateAttemptAt}}{{else}}Retry pending{{end}}</small>{{end}}</span></td>
+            <td><div class="row-actions">{{if ne .BindingID $.BindingID}}<a class="button secondary small" href="/admin/server-review/registration/{{.ID}}">Review server</a>{{end}}{{if and (eq .BindingID $.BindingID) (canRetryTemplate .Status .ExternalUserID)}}
                 <form action="/admin/registrations/{{.ID}}/retry-template" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="small">Retry access</button>
                 </form>
                 {{end}}
-                <form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
+                {{if and (eq .BindingID $.BindingID) (not (registrationActive .Status))}}<form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="danger small">Remove</button>
-                </form></div></td>
-            <td>{{.CreatedAt}}</td>
+                </form>{{end}}</div></td>
+            <td>{{dateTime .CreatedAt}}</td>
         </tr>
         {{else}}
         <tr>
@@ -212,4 +213,4 @@
         {{end}}
         </tbody>
     </table>
-</div>{{template "base-end" .}}{{end}}
+</div><nav class="actions" aria-label="Registration pages">{{if .HistoryBefore}}<a href="/admin/registrations?review={{if .ReviewOnly}}1{{else}}0{{end}}">Newest</a>{{end}}{{if .NextBefore}}<a href="/admin/registrations?review={{if .ReviewOnly}}1{{else}}0{{end}}&amp;before={{.NextBefore}}">Older registrations</a>{{end}}</nav>{{template "base-end" .}}{{end}}
