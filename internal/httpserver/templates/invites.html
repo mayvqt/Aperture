@@ -5,7 +5,7 @@
         <h1>Invites</h1>
         <p>{{.Stats.ActiveInvites}} active invite links</p>
     </div>
-    <a class="button" href="/admin/invites/new">Create invite</a>
+    <a class="button" href="/admin/invites/new">{{template "icon" "plus"}}Create invite</a>
 </div>
 <div class="invite-list">
     {{range .InviteRows}}

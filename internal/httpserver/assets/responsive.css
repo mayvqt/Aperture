@@ -1,137 +1,115 @@
-@media (max-width: 920px) {
-    header {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    main {
-        padding: 22px 16px 46px;
-    }
-
-    .page-head {
-        flex-direction: column;
-    }
-
-    .grid, .grid.four, .split, .public-wrap, .settings-grid, .form-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .stats-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .stats-grid .metric:nth-child(2) {
-        border-right: 0;
-    }
-
-    .stats-grid .metric:nth-child(-n+2) {
-        border-bottom: 1px solid var(--line-soft);
-    }
-
-    .form-grid .span-2 {
-        grid-column: auto;
-    }
-
-    .public-side {
-        min-height: auto;
+/* Narrow layouts. The 1079px breakpoint matches the nav toggle in app.js. */
+@media (min-width: 1080px) {
+    .nav-toggle {
+        display: none !important;
     }
 }
 
-@media (max-width: 620px) {
-    body {
-        font-size: 14px;
+@media (max-width: 1500px) {
+    .dashboard-preview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1180px) {
+    .settings-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1079px) {
+    .app-shell {
+        grid-template-columns: minmax(0, 1fr);
     }
 
-    header {
-        padding: 12px 16px;
-    }
-
-    nav {
-        width: 100%;
-    }
-
-    nav a, nav button, .logout-form button {
-        padding: 8px 9px;
-    }
-
-    h1 {
-        font-size: 28px;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .stats-grid .metric,
-    .stats-grid .metric:nth-child(2),
-    .stats-grid .metric:nth-child(-n+2) {
+    .sidebar {
+        height: auto;
+        gap: 0;
+        padding: 10px var(--gutter);
         border-right: 0;
-        border-bottom: 1px solid var(--line-soft);
+        border-bottom: 1px solid var(--border);
     }
 
-    .stats-grid .metric:last-child {
-        border-bottom: 0;
+    .sidebar-head {
+        min-height: 40px;
+        padding: 0;
     }
 
-    .auth-page {
-        padding: 22px 12px;
-        align-items: start;
+    .nav-toggle {
+        border-color: var(--border-strong);
+        color: var(--text);
     }
 
-    .auth-wrap .panel, .join-card {
-        padding: 22px;
+    .admin-nav {
+        gap: 10px;
+        padding: 12px 0 6px;
     }
 
-    .auth-page h1 {
-        font-size: 30px;
+    .nav-links {
+        overflow: visible;
     }
 
-    .page-head .button, .page-head button {
-        width: 100%;
-        text-align: center;
+    .nav-label {
+        margin-top: 10px;
     }
 
-    .actions {
-        width: 100%;
+    .app-shell > main {
+        padding-top: 24px;
     }
 
-    .actions .button, .actions button {
-        flex: 1 1 auto;
-        text-align: center;
-    }
-
-    .copy-row, .invite-link-cell {
-        grid-template-columns: 1fr;
-    }
-
-    .invite-card-head {
-        align-items: stretch;
-    }
-
-    .invite-card .invite-link-cell {
-        grid-template-columns: 1fr;
-    }
-
-    .row-actions {
-        display: grid;
+    .grid.four {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .row-actions form, .row-actions button {
+    .page-head {
+        margin-bottom: 20px;
+    }
+}
+
+@media (max-width: 640px) {
+    .form-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .invite-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    main > .page-head .actions,
+    main > .page-head > .button {
         width: 100%;
     }
 
-    .health {
-        align-items: stretch;
+    main > .page-head .actions .button,
+    main > .page-head > .button {
+        flex: 1;
+    }
+
+    .notice {
         flex-direction: column;
+        align-items: stretch;
     }
 
-    .health .button {
-        width: 100%;
-        text-align: center;
+    .workflow-body {
+        padding-left: 20px;
     }
 
-    .summary-list {
-        grid-template-columns: 1fr;
+    .auth-wrap .panel,
+    .join-wrap .panel {
+        padding: 24px 20px;
+    }
+
+    th:first-child,
+    td:first-child {
+        padding-left: 16px;
+    }
+
+    th:last-child,
+    td:last-child {
+        padding-right: 16px;
+    }
+
+    .panel .table-wrap {
+        margin: 0 -22px -20px;
     }
 }

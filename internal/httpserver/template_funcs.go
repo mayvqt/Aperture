@@ -38,7 +38,14 @@ var templateFuncs = template.FuncMap{
 		return "—"
 	},
 	"stylesheetHash": func() string { return stylesheetHash },
-	"scriptHash":     func() string { return scriptHash },
+	// initial is the uppercase first letter of a name, for avatar badges.
+	"initial": func(name string) string {
+		for _, r := range name {
+			return strings.ToUpper(string(r))
+		}
+		return ""
+	},
+	"scriptHash": func() string { return scriptHash },
 	"boolText": func(v bool) string {
 		if v {
 			return "yes"

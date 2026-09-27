@@ -10,7 +10,7 @@
 <section class="template-workflows workflow-group">
     <details class="panel workflow-card" open>
         <summary>
-            <span class="workflow-heading"><span class="workflow-icon">+</span><span><strong>Create template</strong><small>Define a permission policy manually</small></span></span>
+            <span class="workflow-heading"><span class="workflow-icon">{{template "icon" "plus"}}</span><span><strong>Create template</strong><small>Define a permission policy manually</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
         <form action="/admin/templates" method="post" class="workflow-body">
@@ -26,7 +26,7 @@
     </details>
     <details class="panel workflow-card">
         <summary>
-            <span class="workflow-heading"><span class="workflow-icon">&#8595;</span><span><strong>Import from user</strong><small>Copy an existing media-server policy</small></span></span>
+            <span class="workflow-heading"><span class="workflow-icon">{{template "icon" "import"}}</span><span><strong>Import from user</strong><small>Copy an existing media-server policy</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
         <form action="/admin/templates/import-from-user" method="post" class="workflow-body">
@@ -64,7 +64,7 @@
             </td>
             <td>
                 <div class="row-actions">
-                    <a class="button secondary" href="/admin/templates/{{.ID}}">View</a>
+                    <a class="button secondary small" href="/admin/templates/{{.ID}}">View</a>
                     {{if not .IsDefault}}
                     <form action="/admin/templates/{{.ID}}/default" method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}">
@@ -110,7 +110,7 @@
 <section class="template-workflows workflow-group">
     <details class="panel workflow-card" open>
         <summary>
-            <span class="workflow-heading"><span class="workflow-icon">&#9998;</span><span><strong>Edit template</strong><small>Update its name and permission policy</small></span></span>
+            <span class="workflow-heading"><span class="workflow-icon">{{template "icon" "edit"}}</span><span><strong>Edit template</strong><small>Update its name and permission policy</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
         <form action="/admin/templates/{{.Template.ID}}" method="post" class="workflow-body">
@@ -127,7 +127,7 @@
     </details>
     <details class="panel workflow-card">
         <summary>
-            <span class="workflow-heading"><span class="workflow-icon">&#123;&#125;</span><span><strong>Policy details</strong><small>Review the resolved access summary and JSON</small></span></span>
+            <span class="workflow-heading"><span class="workflow-icon">{{template "icon" "code"}}</span><span><strong>Policy details</strong><small>Review the resolved access summary and JSON</small></span></span>
             <span class="disclosure-icon" aria-hidden="true"></span>
         </summary>
         <div class="workflow-body">
