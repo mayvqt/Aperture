@@ -6,16 +6,19 @@
         <p>See active invites, recent signups, and expiring accounts.</p>
     </div>
     <p class="actions">
-        <a class="button" href="/admin/invites/new">Create invite</a>
         <a class="button secondary" href="/admin/templates">Templates</a>
+        <a class="button" href="/admin/invites/new">{{template "icon" "plus"}}Create invite</a>
     </p>
 </div>{{if .HealthChecks}}
 <section class="health-list">
     {{range .HealthChecks}}
     <div class="notice health {{.Level}}">
-        <div>
-            <strong>{{.Title}}</strong>
-            <p>{{.Detail}}</p>
+        <div class="notice-body">
+            <span class="notice-icon">{{if eq .Level "good"}}{{template "icon" "check"}}{{else}}{{template "icon" "alert"}}{{end}}</span>
+            <div>
+                <strong>{{.Title}}</strong>
+                <p>{{.Detail}}</p>
+            </div>
         </div>
         {{if .URL}}<a class="button secondary small" href="{{.URL}}">{{.Action}}</a>{{end}}
     </div>
@@ -23,27 +26,27 @@
 </section>{{end}}
 <section class="grid four stats-grid">
     <div class="metric">
+        <span class="metric-label">{{template "icon" "invites"}}Active invites</span>
         <strong>{{.Stats.ActiveInvites}}</strong>
-        <span>active invites</span>
     </div>
     <div class="metric">
+        <span class="metric-label">{{template "icon" "registrations"}}Recent signups</span>
         <strong>{{.Stats.Registrations}}</strong>
-        <span>recent signups</span>
     </div>
-    <div class="metric">
+    <a class="metric{{if .Stats.NeedsAttention}} is-attention{{end}}" href="/admin/registrations?review=1">
+        <span class="metric-label">{{template "icon" "alert"}}Review needed</span>
         <strong>{{.Stats.NeedsAttention}}</strong>
-        <a href="/admin/registrations?review=1">review needed</a>
-    </div>
+    </a>
     <div class="metric">
+        <span class="metric-label">{{template "icon" "clock"}}Accounts expiring</span>
         <strong>{{.Stats.ScheduledUserDisables}}</strong>
-        <span>accounts expiring</span>
     </div>
 </section>
 <section class="dashboard-preview section">
     <div class="panel">
         <div class="page-head">
             <h2>Invites</h2>
-            <a class="button secondary" href="/admin/invites">View all</a>
+            <a class="button secondary small" href="/admin/invites">View all</a>
         </div>
         <div class="table-wrap">
             <table>
@@ -58,11 +61,11 @@
                 <tbody>{{range .Invites}}
                 <tr>
                     <td>{{.Label}}</td>
-                    <td>{{.Uses}} / {{.MaxUses}}</td>
+                    <td class="nowrap">{{.Uses}} / {{.MaxUses}}</td>
                     <td>
                         <span class="status {{inviteStateClass . $.BindingID}}">{{inviteState . $.BindingID}}</span>
                     </td>
-                    <td>{{userExpiryText .UserExpiryDays}}</td>
+                    <td class="nowrap">{{userExpiryText .UserExpiryDays}}</td>
                 </tr>
                 {{else}}
                 <tr>
@@ -76,7 +79,7 @@
     <div class="panel">
         <div class="page-head">
             <h2>Recent signups</h2>
-            <a class="button secondary" href="/admin/registrations">View all</a>
+            <a class="button secondary small" href="/admin/registrations">View all</a>
         </div>
         <div class="table-wrap">
             <table>
@@ -86,17 +89,17 @@
                     <th>Status</th>
                     <th>Access ends</th>
                     <th>Next retry</th>
-                    <th></th>
+                    <th><span class="sr-only">Actions</span></th>
                 </tr>
                 </thead>
                 <tbody>{{range .Registrations}}
                 <tr>
-                    <td>{{.Username}}{{if ne .BindingID $.BindingID}}<small> · {{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</td>
+                    <td>{{.Username}}{{if ne .BindingID $.BindingID}}<small>{{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</td>
                     <td>
                         <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
                     </td>
-                    <td>{{nullDate .UserDisableAt}}</td>
-                    <td>{{registrationNextRetry .}}</td>
+                    <td class="nowrap">{{or (nullDate .UserDisableAt) "—"}}</td>
+                    <td class="nowrap">{{registrationNextRetry .}}</td>
                     <td>{{if and (eq .BindingID $.BindingID) (not (registrationActive .Status))}}<form action="/admin/registrations/{{.ID}}/delete" data-confirm="Delete this user from the media server and remove Aperture's record?" method="post">
                         <input name="csrf" type="hidden" value="{{$.CSRF}}"><input name="return_to" type="hidden" value="/admin">
                         <button class="danger small">Remove</button>
@@ -166,9 +169,12 @@
     <div>
         <p class="eyebrow">Account history</p>
         <h1>Registrations</h1>
- <p><a href="/admin/registrations">All history</a> · <a href="/admin/registrations?review=1">Needs review</a></p>
         <p>Accounts created from invite links and any follow-up work.</p>
     </div>
+    <nav class="segmented" aria-label="Registration filter">
+        <a href="/admin/registrations"{{if not .ReviewOnly}} aria-current="page"{{end}}>All history</a>
+        <a href="/admin/registrations?review=1"{{if .ReviewOnly}} aria-current="page"{{end}}>Needs review</a>
+    </nav>
 </div>
 <div class="table-wrap">
     <table>
@@ -176,21 +182,18 @@
         <tr>
             <th>User</th>
             <th>Status</th>
-            <th>Account ID</th>
             <th>Access window</th>
             <th>Disable retries</th>
 			<th>Access sync</th>
-            <th>Action</th>
-            <th>Created</th>
+            <th><span class="sr-only">Actions</span></th>
         </tr>
         </thead>
         <tbody>{{range .Registrations}}
         <tr>
-            <td>{{.Username}}{{if ne .BindingID $.BindingID}}<small> · {{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</td>
+            <td><span class="cell-stack"><strong>{{.Username}}</strong>{{if .ExternalUserID.Valid}}<small>ID <code>{{.ExternalUserID.String}}</code></small>{{end}}<small>Created {{dateTime .CreatedAt}}</small>{{if ne .BindingID $.BindingID}}<small>{{if .BindingID}}Previous server{{else}}Unverified server{{end}}</small>{{end}}</span></td>
             <td>
                 <span class="{{statusClass .Status}}">{{registrationStatus .Status}}</span>
             </td>
-            <td>{{.ExternalUserID.String}}</td>
             <td><span class="cell-stack">{{if .UserDisableAt.Valid}}Ends {{nullDate .UserDisableAt}}{{else}}No expiry{{end}}{{if .UserDisabledAt.Valid}}<small>Disabled {{nullDate .UserDisabledAt}}</small>{{end}}</span></td>
             <td><span class="cell-stack">{{if .CleanupPending}}Disable pending{{else}}{{.DisableAttempts}} attempts{{end}}{{if .CleanupError.Valid}}<small>Last attempt failed</small>{{end}}{{if and .NextDisableAttemptAt.Valid (not .UserDisabledAt.Valid)}}<small>Next {{nullDateTime .NextDisableAttemptAt}}</small>{{end}}</span></td>
 			<td><span class="cell-stack">{{.TemplateAttempts}} attempts{{if canRetryTemplate .Status .ExternalUserID}}<small>{{if ge .TemplateAttempts 6}}Automatic retries finished; review access{{else if .NextTemplateAttemptAt.Valid}}Next {{nullDateTime .NextTemplateAttemptAt}}{{else}}Retry pending{{end}}</small>{{end}}</span></td>
@@ -204,11 +207,10 @@
                     <input name="csrf" type="hidden" value="{{$.CSRF}}">
                     <button class="danger small">Remove</button>
                 </form>{{end}}</div></td>
-            <td>{{dateTime .CreatedAt}}</td>
         </tr>
         {{else}}
         <tr>
-			<td colspan="8">No registrations yet.</td>
+			<td colspan="6">No registrations yet.</td>
         </tr>
         {{end}}
         </tbody>

@@ -1,114 +1,352 @@
-body.auth-shell {
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow-x: hidden;
-    background: var(--bg);
+/* Page-specific layouts. */
+
+/* Dashboard */
+.stats-grid {
+    margin-bottom: 20px;
 }
 
-.auth-page {
-    width: 100%;
-    max-width: none;
-    min-height: 100vh;
-    min-height: 100dvh;
-    margin: 0;
+.dashboard-preview {
     display: grid;
-    place-items: center;
-    padding: 32px 16px;
-    background: transparent;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    align-items: start;
 }
 
-.auth-wrap {
-    width: min(100%, 440px);
-    margin: 0 auto;
+/* Invites */
+.invite-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 14px;
 }
 
-.auth-wrap .panel, .join-card {
-    padding: 30px;
-    border-color: var(--line);
-    box-shadow: var(--shadow);
+.invite-list > .empty {
+    grid-column: 1 / -1;
 }
 
-.auth-page h1 {
-    margin-bottom: 10px;
-    font-size: 34px;
+.invite-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
 }
 
-.auth-page form {
-    max-width: none;
-    margin-top: 20px;
+.invite-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
 }
 
-.auth-page button {
+.invite-card-head h2 {
+    font-size: 16px;
+}
+
+.invite-card-head p {
     margin-top: 2px;
+    color: var(--muted);
+    font-size: 13px;
 }
 
-.join-wrap {
-    width: min(100%, 520px);
-    margin: 0 auto;
+.invite-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    color: var(--muted);
+    font-size: 12.5px;
 }
 
-.join-card p {
+.invite-details span {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+}
+
+.invite-details strong {
+    color: var(--text);
+    font-size: 14px;
+}
+
+.invite-link-cell {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.row-url {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    color: var(--text-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    user-select: all;
+}
+
+.invite-link-cell button {
+    height: 36px;
+}
+
+.copy-status {
+    flex-basis: 100%;
+    color: var(--ok-text);
+    font-size: 12.5px;
+}
+
+.copy-status:empty {
+    display: none;
+}
+
+.invite-card .row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.invite-card .muted {
+    font-size: 13px;
+}
+
+/* Templates */
+.templates-list {
+    padding-bottom: 20px;
+}
+
+.summary-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.summary-pills span {
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.summary-pills strong {
+    color: var(--text-2);
+    font-weight: 500;
+}
+
+.summary-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+    margin: 12px 0 20px;
+}
+
+.summary-list div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.summary-list strong {
+    color: var(--text);
+    font-size: 14px;
+}
+
+.workflow-body h3 + pre {
+    margin-top: 8px;
+}
+
+/* Settings */
+.settings-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.settings-grid aside p {
+    color: var(--text-2);
+    font-size: 14px;
+}
+
+/* Webhooks */
+.stack {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.webhook-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+}
+
+.panel > h2 + .webhook-card {
+    padding-top: 0;
+    border-top: 0;
+}
+
+.webhook-card .hint {
+    font-size: 12.5px;
+    overflow-wrap: anywhere;
+}
+
+.webhook-events {
+    color: var(--text-2);
+    font-size: 13px;
+}
+
+.webhook-card .actions {
+    margin-top: 8px;
+}
+
+/* Audit */
+.audit-table td {
+    white-space: nowrap;
+}
+
+.audit-details summary {
+    color: var(--accent-strong);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+.audit-details pre {
+    max-width: 420px;
+    margin-top: 8px;
+    white-space: pre-wrap;
+}
+
+/* Server review */
+.server-review {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 720px;
+}
+
+.server-review p {
+    color: var(--text-2);
+}
+
+.server-review p strong {
+    color: var(--text);
+}
+
+.server-review form {
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+.server-review .actions {
     margin-top: 0;
 }
 
-.join-card .notice {
-    margin: 18px 0 0;
+/* Auth, setup, and public invite pages */
+.auth-shell {
+    background:
+        radial-gradient(700px 480px at 50% -10%, rgb(255 138 114 / 0.16), transparent 70%),
+        radial-gradient(600px 400px at 100% 100%, rgb(255 138 114 / 0.06), transparent 70%),
+        var(--bg);
+    background-attachment: fixed;
 }
 
-.join-card .guide-actions {
-    margin: 22px 0 0;
-}
-
-.public-wrap {
-    max-width: 980px;
-    margin: 30px auto;
+.auth-page {
     display: grid;
-    grid-template-columns: minmax(0, .9fr) minmax(320px, 1fr);
-    gap: 22px;
-    align-items: stretch;
+    place-items: center;
+    min-height: 100vh;
+    padding: 40px 16px;
 }
 
-.public-side {
-    background: var(--panel-2);
-    color: var(--ink);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 26px;
-    min-height: 420px;
+.auth-wrap,
+.join-wrap {
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    box-shadow: var(--shadow);
+    gap: 18px;
+    width: min(100%, 420px);
 }
 
-.public-side p, .public-side .hint {
-    color: var(--muted);
+.auth-wrap:not(.login-wrap):has(select) {
+    width: min(100%, 520px);
 }
 
-.public-card {
-    background: var(--panel);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 24px;
-    box-shadow: var(--shadow);
-}
-
-.check-list {
-    display: grid;
-    gap: 10px;
-    padding: 0;
-    margin: 18px 0 0;
-    list-style: none;
-}
-
-.check-list li {
+.auth-brand {
     display: flex;
-    gap: 8px;
-    color: var(--ink);
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 17px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
 }
 
-.check-list li::before {
-    content: "✓";
-    font-weight: 800;
-    color: var(--accent);
+.auth-brand::before {
+    content: "";
+    width: 30px;
+    height: 30px;
+    background: url("/assets/aperture-mark.svg") center / contain no-repeat;
+}
+
+.auth-wrap .panel,
+.join-wrap .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 30px;
+    border-color: var(--border-strong);
+    border-radius: 20px;
+    background: rgb(20 20 29 / 0.92);
+    box-shadow: 0 40px 80px -40px rgb(0 0 0 / 0.9);
+    backdrop-filter: blur(12px);
+}
+
+.auth-wrap h1,
+.join-wrap h1 {
+    font-size: 24px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.auth-wrap h1 + p,
+.join-wrap h1 + p,
+.auth-intro {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.auth-wrap form,
+.join-wrap form {
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.auth-wrap .notice,
+.join-wrap .notice {
+    margin: 14px 0 0;
+}
+
+.auth-wrap form > button,
+.join-wrap form > button {
+    align-self: stretch;
+    height: 42px;
+    margin-top: 4px;
 }

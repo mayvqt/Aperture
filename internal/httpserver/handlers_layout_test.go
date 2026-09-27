@@ -19,10 +19,10 @@ func TestAdminNavShowsDashboardWithoutBrandIcon(t *testing.T) {
 		t.Fatalf("status = %d, want 200; body %s", rr.Code, rr.Body.String())
 	}
 	body := rr.Body.String()
-	if !strings.Contains(body, `<a href="/admin"`) || !strings.Contains(body, `>Dashboard</a>`) {
+	if !strings.Contains(body, `<a href="/admin"`) || !strings.Contains(body, `<span>Dashboard</span></a>`) {
 		t.Fatalf("body missing dashboard nav:\n%s", body)
 	}
-	if !strings.Contains(body, `<title>Dashboard · Aperture</title>`) || !strings.Contains(body, `<a href="/admin" aria-current="page">Dashboard</a>`) {
+	if !strings.Contains(body, `<title>Dashboard · Aperture</title>`) || !strings.Contains(body, `<a href="/admin" aria-current="page"><svg`) {
 		t.Fatalf("body missing page title or current navigation state:\n%s", body)
 	}
 	if strings.Contains(body, "brand-mark") {
