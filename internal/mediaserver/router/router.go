@@ -1,3 +1,4 @@
+// Package router selects an immutable provider adapter factory by provider.
 package router
 
 import (

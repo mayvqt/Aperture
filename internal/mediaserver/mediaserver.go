@@ -1,3 +1,5 @@
+// Package mediaserver defines provider-neutral contracts and URL rules for
+// media-server adapters.
 package mediaserver
 
 import (

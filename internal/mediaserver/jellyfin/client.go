@@ -1,3 +1,4 @@
+// Package jellyfin adapts the shared protocol client to Jellyfin.
 package jellyfin
 
 import (

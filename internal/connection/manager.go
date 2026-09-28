@@ -1,5 +1,6 @@
-// Package connection owns effective configuration and immutable media-server
-// snapshots. Publishing settings never mutates an adapter already in use.
+// Package connection owns effective configuration, immutable operation
+// snapshots, server identity verification, and atomic connection publication.
+// Publishing settings never mutates an adapter already in use.
 package connection
 
 import (

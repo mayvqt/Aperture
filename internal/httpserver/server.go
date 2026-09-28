@@ -1,3 +1,6 @@
+// Package httpserver serves routes, middleware, browser workflows, embedded
+// templates/assets, shared account recovery, webhooks, and maintenance
+// coordination.
 package httpserver
 
 import (
