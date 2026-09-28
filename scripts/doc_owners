@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Prints the doc pages (and sections) that own the files changed on this
+# branch, so docs are reviewed from a list rather than from memory. The
+# mapping is the "Documentation impact map" table in
+# docs/development/documentation-conventions.md; this script only reads it.
+#
+# Usage: scripts/doc_owners [<base> [<head>]]
+#   Changed files are those committed since the merge base with <base>
+#   (default: origin/main, else main), plus uncommitted and untracked files.
+#   With <head>, only the commits in <base>...<head> count.
+#   Prints one page per line, repo-relative, or nothing if no row matches.
+set -euo pipefail
+set -f # patterns come from the table; never expand them against the disk
+
+root="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"
+conventions="docs/development/documentation-conventions.md"
+cd "$root"
+
+base="${1:-}" head="${2:-}"
+if [[ -z $base ]]; then
+  base=origin/main
+  git rev-parse -q --verify "$base^{commit}" >/dev/null || base=main
+fi
+for ref in "$base" "${head:-HEAD}"; do
+  if ! git rev-parse -q --verify "$ref^{commit}" >/dev/null; then
+    echo "doc_owners: unknown revision '$ref'" >&2
+    exit 2
+  fi
+done
+
+if [[ -n $head ]]; then
+  mapfile -t changed < <(git diff --name-only "$base...$head")
+else
+  mapfile -t changed < <({
+    git diff --name-only "$base"...HEAD
+    git diff --name-only HEAD
+    git ls-files --others --exclude-standard
+  } | sort -u)
+fi
+
+# Resolves link $2 relative to directory $1 into a normalized repo path.
+resolve() {
+  local part out=() path="$1/$2"
+  local IFS=/
+  for part in $path; do
+    case $part in
+      ''|.) ;;
+      ..) unset 'out[${#out[@]}-1]' ;;
+      *) out+=("$part") ;;
+    esac
+  done
+  echo "${out[*]}"
+}
+
+# Emits "patterns<TAB>pages" for each data row of the impact map.
+rows() {
+  awk -F'|' '
+    /^## / { in_map = ($0 == "## Documentation impact map"); next }
+    in_map && /^\|/ && ++n > 2 { print $3 "\t" $4 }
+  ' "$conventions"
+}
+
+owners() {
+  local patterns pages pattern file link
+  while IFS=$'\t' read -r patterns pages; do
+    # shellcheck disable=SC2016 # backticks are literal
+    for pattern in $(grep -o '`[^`]*`' <<<"$patterns" | tr -d '`'); do
+      for file in "${changed[@]}"; do
+        # shellcheck disable=SC2254 # unquoted so the pattern matches
+        case $file in
+          $pattern)
+            grep -o '\]([^)]*)' <<<"$pages" | sed 's/^](//; s/)$//' | while IFS= read -r link; do
+              resolve "$(dirname "$conventions")" "$link"
+            done
+            continue 3
+            ;;
+        esac
+      done
+    done
+  done < <(rows)
+}
+
+# A whole page supersedes links to its sections.
+owners | sort -u | awk -F'#' '{ page[NR] = $1; line[NR] = $0; whole[$0] = 1 }
+  END { for (i = 1; i <= NR; i++) if (line[i] == page[i] || !(page[i] in whole)) print line[i] }'
