@@ -1,5 +1,9 @@
 # Development task index
 
+Run a local server with `go run ./cmd/aperture serve` (commands are in
+`cmd/aperture/commands.go`), then open `http://localhost:8099/setup`. Go does
+not load `.env` automatically.
+
 Read only the pages needed for the task:
 
 - Find ownership or an entry point: [Codebase map](codebase-map.md).

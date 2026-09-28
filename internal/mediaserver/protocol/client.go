@@ -1,3 +1,4 @@
+// Package protocol implements the shared Jellyfin/Emby HTTP client protocol.
 package protocol
 
 import (

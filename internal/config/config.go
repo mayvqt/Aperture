@@ -1,3 +1,5 @@
+// Package config parses environment and flag configuration, applies
+// defaults, validates URLs, and bootstraps a generated encryption key.
 package config
 
 import (

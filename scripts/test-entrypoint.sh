@@ -1,4 +1,6 @@
 #!/bin/sh
+# Exercises docker-entrypoint.sh against stubbed id/chown/gosu/aperture so the
+# ownership and privilege-drop logic is checked without a real container.
 set -eu
 
 ROOT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)"

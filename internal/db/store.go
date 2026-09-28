@@ -1,3 +1,5 @@
+// Package db owns the SQLite schema, migrations, settings, invites,
+// templates, sessions, registrations, managed users, and audit records.
 package db
 
 import (

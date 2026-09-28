@@ -1,3 +1,4 @@
+// Package emby adapts the shared protocol client to Emby.
 package emby
 
 import (

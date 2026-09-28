@@ -1,3 +1,5 @@
+// Package main dispatches Aperture's CLI commands and owns configuration
+// startup, logging, process lifecycle, and version output.
 package main
 
 import (

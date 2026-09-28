@@ -1,3 +1,5 @@
+// Package security provides encryption, token helpers, and diagnostic
+// redaction.
 package security
 
 import (
